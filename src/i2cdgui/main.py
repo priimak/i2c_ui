@@ -5,12 +5,12 @@ import serial.tools.list_ports as slp
 from PySide6.QtCore import QSize, QByteArray
 from PySide6.QtGui import QPalette, Qt, QCloseEvent
 from PySide6.QtWidgets import QApplication, QMessageBox, QSplitter
+from i2cdgui.app import App
+from i2cdgui.commands_panel import CommandsPanel
+from i2cdgui.results_panel import ResultsPanel
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, ComboBox
 from pytide6.palette import Palette
 from sprats.config import AppPersistence
-
-from i2cdgui.app import App
-from i2cdgui.commands_panel import CommandsPanel
 
 
 def get_ports() -> list[str]:
@@ -47,13 +47,18 @@ class I2CDriverWindow(MainWindow):
         self.app = app
         info_panel = InfoPanel(app)
 
+        if info_panel.com_port_selector.count() == 0:
+            self.show_error("I2C Master device not found")
+            sys.exit(0)
+
         self.hsplitter = QSplitter(Qt.Orientation.Horizontal)
         self.hsplitter.setChildrenCollapsible(False)
         self.hsplitter.setHandleWidth(8)
-        left_panel = VBoxPanel(widgets=[], background_color="lightblue")
 
+        self.res_table = ResultsPanel(self.app)
+        self.app.show_read_register_results = self.res_table.show_register_value
+        left_panel = VBoxPanel(widgets=[self.res_table], background_color="gray", margins=1)
         self.hsplitter.addWidget(left_panel)
-        self.hsplitter.setSizes([500])
 
         cpanel = CommandsPanel(app)
         cpanel.setBackgroundColor("orange")
@@ -66,7 +71,7 @@ class I2CDriverWindow(MainWindow):
             )
         )
 
-        app.i2c.scan(silent=True)
+        app.show_error = self.show_error
 
     @override
     def closeEvent(self, event: QCloseEvent):
@@ -82,6 +87,9 @@ class I2CDriverWindow(MainWindow):
         spl_state = self.app.persistence.state.get_value("splitter_state")
         if spl_state is not None:
             self.hsplitter.restoreState(QByteArray.fromBase64(spl_state.encode("utf-8")))
+
+    def show_error(self, message: str) -> None:
+        QMessageBox.critical(self, "Error", message)
 
 
 def main():
