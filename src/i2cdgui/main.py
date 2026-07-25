@@ -7,6 +7,7 @@ from PySide6.QtGui import QPalette, Qt, QCloseEvent
 from PySide6.QtWidgets import QApplication, QMessageBox, QSplitter
 from i2cdgui.app import App
 from i2cdgui.commands_panel import CommandsPanel
+from i2cdgui.menus import MainMenuBar
 from i2cdgui.results_panel import ResultsPanel
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, ComboBox
 from pytide6.palette import Palette
@@ -45,11 +46,10 @@ class I2CDriverWindow(MainWindow):
         set_geometry(app_state=app.persistence.state, widget=self, screen_dim=screen_dim, win_size_fraction=0.7)
 
         self.app = app
-        info_panel = InfoPanel(app)
+        self.info_panel = InfoPanel(app)
 
-        if info_panel.com_port_selector.count() == 0:
-            self.show_error("I2C Master device not found")
-            sys.exit(0)
+        # if self.info_panel.com_port_selector.count() == 0:
+        #     self.show_error("I2C Master device not found")
 
         self.hsplitter = QSplitter(Qt.Orientation.Horizontal)
         self.hsplitter.setChildrenCollapsible(False)
@@ -66,12 +66,16 @@ class I2CDriverWindow(MainWindow):
         self.hsplitter.addWidget(right_panel)
         self.setCentralWidget(
             VBoxPanel(
-                widgets=[W(HBoxPanel(widgets=[self.hsplitter]), stretch=2), info_panel],
+                widgets=[W(HBoxPanel(widgets=[self.hsplitter]), stretch=2), self.info_panel],
                 spacing=0, margins=(0, 0, 0, 0)
             )
         )
 
         app.show_error = self.show_error
+
+        self.main_menu_bar = self.setMenuBar(MainMenuBar(self.app, dialogs_parent=self))
+        self.app.exit_application.clear()
+        self.app.exit_application.append(self.close)
 
     @override
     def closeEvent(self, event: QCloseEvent):
@@ -115,6 +119,8 @@ def main():
         win.activateWindow()
         win.raise_()
         win.restore()
+        if win.info_panel.com_port_selector.count() == 0:
+            win.app.show_error("I2C Master device not found. Connect device and restart application.")
 
         sys.exit(app.exec())
     except Exception as ex:

@@ -3,6 +3,7 @@ from typing import Optional
 
 from i2c_api import I2CMaster
 from i2capi_i2cdriver import I2CMasterI2CDriver
+from i2cdgui.dummy_i2cmaster import DummyI2CMaster
 from i2cdriver import I2CDriver
 from sprats.config import AppPersistence
 
@@ -22,12 +23,14 @@ class App:
         self.show_error: Callable[[str], None] = lambda _: None
 
         self.show_read_register_results: Callable[[str, str, str], None] = lambda a, b, c: None
+        self.exit_application: [Callable[[], None]] = [lambda: None]
 
     def change_read_register_address(self, address: str):
         self.read_register_address_str = address
 
     def device_address_changed(self, device_address: str):
-        self.device_address = int(device_address, 16)
+        if device_address != "":
+            self.device_address = int(device_address, 16)
 
     @property
     def i2c(self) -> Optional[I2CMaster]:
@@ -37,7 +40,7 @@ class App:
         if self.port != new_port:
             self.port = new_port if len(new_port) > 0 else None
             if self.port is None:
-                self._i2c_driver = None
+                self._i2c_driver = DummyI2CMaster()
             else:
                 self._i2c_driver = I2CMasterI2CDriver(I2CDriver(self.port))
                 for c in self.i2c_master_changed:
