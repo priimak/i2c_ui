@@ -1,6 +1,6 @@
-from PySide6.QtCore import QAbstractTableModel, QTimer
+from PySide6.QtCore import QAbstractTableModel, QTimer, QModelIndex
 from PySide6.QtGui import Qt, QColor
-from PySide6.QtWidgets import QTableView, QAbstractItemView
+from PySide6.QtWidgets import QTableView, QAbstractItemView, QMenu
 from i2cdgui.app import App
 
 
@@ -70,7 +70,22 @@ class ResultsPanel(QTableView):
         self.setModel(self.model)
         self.doubleClicked.connect(self.re_read_register)
 
-    def re_read_register(self, index):
+        self.context_menu = QMenu(self)
+        self.context_menu.addAction("Define register")
+        self.context_menu.addAction("Re-read from device")
+
+        self.context_menu.addAction("Remove from results panel", self.remove_select_reg_result)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(lambda pos: self.context_menu.popup(self.viewport().mapToGlobal(pos)))
+
+    def remove_select_reg_result(self):
+        idx = self.currentIndex()
+        if idx is not None:
+            self.model.beginResetModel()
+            self.model.rows.pop(idx.row())
+            self.model.endResetModel()
+
+    def re_read_register(self, index: QModelIndex):
         self.app.read_register_at_addr(int(self.model.rows[index.row()][0], 16))
 
     def off_highlight(self):
