@@ -98,7 +98,7 @@ requires-dist = [
     { name = "i2capi-i2cdriver", git = "https://github.com/priimak/i2capi_i2cdriver.git?rev=v0.1.2" },
     { name = "i2cdriver", specifier = "==1.0.6" },
     { name = "pyside6", specifier = "==6.9" },
-    { name = "pytide6", git = "https://github.com/priimak/PyTide6.git?rev=v0.8.0" },
+    { name = "pytide6", git = "https://github.com/priimak/PyTide6.git?rev=v0.9.0" },
     { name = "usb-monitor" },
 ]
 
@@ -173,8 +173,8 @@ wheels = [
 
 [[package]]
 name = "pytide6"
-version = "0.7.0.post1+git.693e865d.dirty"
-source = { git = "https://github.com/priimak/PyTide6.git?rev=v0.8.0#693e865dc344b63c0cbc4fa82996f7560fb3e055" }
+version = "0.9.0.post0+git.4bf0180b.dirty"
+source = { git = "https://github.com/priimak/PyTide6.git?rev=v0.9.0#4bf0180b13ee6b2ec6dfa5c183a927386916d523" }
 dependencies = [
     { name = "pyside6" },
     { name = "sprats" },

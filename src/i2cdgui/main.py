@@ -5,13 +5,15 @@ import serial.tools.list_ports as slp
 from PySide6.QtCore import QSize, QByteArray
 from PySide6.QtGui import QPalette, Qt, QCloseEvent
 from PySide6.QtWidgets import QApplication, QMessageBox, QSplitter
-from i2cdgui.app import App
-from i2cdgui.commands_panel import CommandsPanel
-from i2cdgui.menus import MainMenuBar
-from i2cdgui.results_panel import ResultsPanel
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, ComboBox
 from pytide6.palette import Palette
 from sprats.config import AppPersistence
+
+from i2cdgui.app import App
+from i2cdgui.commands_panel import CommandsPanel
+from i2cdgui.i2c_op_thread import Quit
+from i2cdgui.menus import MainMenuBar
+from i2cdgui.results_panel import ResultsPanel
 
 
 def get_ports() -> list[str]:
@@ -56,13 +58,14 @@ class I2CDriverWindow(MainWindow):
         self.hsplitter.setHandleWidth(8)
 
         self.res_table = ResultsPanel(self.app)
-        self.app.show_read_register_results = self.res_table.show_register_value
         left_panel = VBoxPanel(widgets=[self.res_table], background_color="gray", margins=1)
         self.hsplitter.addWidget(left_panel)
 
         cpanel = CommandsPanel(app)
         cpanel.setBackgroundColor("orange")
-        right_panel = VBoxPanel(widgets=[cpanel, W(VBoxPanel(background_color="pink"), stretch=2)], margins=0)
+        right_panel = VBoxPanel(widgets=[
+            VBoxPanel([cpanel], background_color="black", margins=1), W(VBoxPanel(background_color="pink"), stretch=2)
+        ], margins=0)
         self.hsplitter.addWidget(right_panel)
         self.setCentralWidget(
             VBoxPanel(
@@ -72,10 +75,15 @@ class I2CDriverWindow(MainWindow):
         )
 
         app.show_error = self.show_error
+        app.connect_show_error(self.show_error)
+        app.connect_show_register_value(self.res_table.show_register_value)
 
         self.main_menu_bar = self.setMenuBar(MainMenuBar(self.app, dialogs_parent=self))
-        self.app.exit_application.clear()
-        self.app.exit_application.append(self.close)
+        self.app.exit_application[0] = self.exit_application
+
+    def exit_application(self):
+        self.app.op_thread.commands.put(Quit())
+        self.close()
 
     @override
     def closeEvent(self, event: QCloseEvent):

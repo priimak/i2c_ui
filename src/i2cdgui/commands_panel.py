@@ -1,7 +1,8 @@
 from i2c_api import I2CMaster
-from i2cdgui.app import App
 from pytide6 import VBoxPanel, W, HBoxPanel, PushButton, Label, ComboBox
 from pytide6.inputs import LineEdit
+
+from i2cdgui.app import App
 
 
 class AddrSelector(ComboBox):
@@ -61,18 +62,37 @@ class CommandsPanel(VBoxPanel):
             ])
         )
 
-        panel = VBoxPanel([HBoxPanel(
-            [PushButton("Read Register", on_clicked=app.read_register), Label(" Addr:"),
-             LineEdit(app.read_register_address_str, on_text_change=app.change_read_register_address),
-             Label(" Num Bytes:"),
-             ComboBox(items=["1", "2", "3", "4"], current_selection=f"{app.read_register_num_bytes}"),
-             W(Label(""), stretch=1)]),
-            HBoxPanel(
-                [PushButton("Write Register"), Label(" Addr:"), LineEdit(), Label(" Value:"),
-                 LineEdit(), Label(" Num Bytes:"),
-                 ComboBox(items=["1", "2", "3", "4"], current_selection=f"{app.write_register_num_bytes}"),
-                 W(Label(""), stretch=1)])],
-            margins=0)
+        reg_addres_input = []
+
+        def do_read_register(_: str):
+            app.read_register()
+            reg_addres_input[0].selectAll()
+
+        reg_addres_input.append(LineEdit(
+            text=app.read_register_address_str,
+            on_text_change=app.change_read_register_address,
+            on_key_enter=do_read_register
+        ))
+
+        panel = VBoxPanel([
+            HBoxPanel([
+                PushButton("Read Register", on_clicked=app.read_register), Label(" Addr:"),
+                reg_addres_input[0],
+                Label(" Num Bytes:"),
+                ComboBox(
+                    items=["1", "2", "3", "4"],
+                    current_selection=f"{app.read_register_num_bytes}",
+                    on_text_change=app.change_read_register_num_bytes
+                ),
+                W(Label(""), stretch=1)
+            ]),
+            HBoxPanel([
+                PushButton("Write Register"), Label(" Addr:"), LineEdit(), Label(" Value:"),
+                LineEdit(), Label(" Num Bytes:"),
+                ComboBox(items=["1", "2", "3", "4"], current_selection=f"{app.write_register_num_bytes}"),
+                W(Label(""), stretch=1)
+            ])
+        ], margins=0)
         self.addWidget(HBoxPanel([W(Label(""), stretch=1), panel, W(Label(""), stretch=1)]))
 
     def i2c_master_changed(self, i2c: I2CMaster) -> None:

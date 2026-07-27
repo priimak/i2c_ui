@@ -3,9 +3,12 @@ from typing import Optional
 
 from i2c_api import I2CMaster
 from i2capi_i2cdriver import I2CMasterI2CDriver
-from i2cdgui.dummy_i2cmaster import DummyI2CMaster
 from i2cdriver import I2CDriver
 from sprats.config import AppPersistence
+
+from i2cdgui.dummy_i2cmaster import DummyI2CMaster
+from i2cdgui.i2c_op_thread import I2COpThread, ReadRegister, HighlightOff
+from i2cdgui.reg_read_results import ShowRegSignalData
 
 
 class App:
@@ -13,7 +16,7 @@ class App:
         self._i2c_driver: Optional[I2CMaster] = None
         self.port: str | None = None
         self.persistence = persistence
-        self.i2c_master_changed: list[Callable[[I2CMaster],]] = []
+        self.i2c_master_changed: list[Callable[[I2CMaster], None]] = []
 
         self.device_address: int = -1
         self.read_register_num_bytes: int = 1
@@ -22,11 +25,35 @@ class App:
         self.write_register_num_bytes: int = 1
         self.show_error: Callable[[str], None] = lambda _: None
 
-        self.show_read_register_results: Callable[[str, str, str], None] = lambda a, b, c: None
-        self.exit_application: [Callable[[], None]] = [lambda: None]
+        self.show_read_register_results: Callable[[str, str, str, bool], None] = lambda a, b, c, d: None
+        self.exit_application: list[Callable[[], None]] = [lambda: None]
+        self.re_read_all_period_millis: int = -1
+        self.toggle_reloading_label_highlight: Callable[[], None] = lambda: None
+        self.reloading_label_highlight_off: Callable[[], None] = lambda: None
+
+        self.op_thread = I2COpThread()
+        self.op_thread.start()
+
+    def connect_show_error(self, show_error: Callable[[str], None]):
+        self.op_thread.show_error.connect(show_error)
+
+    def connect_show_register_value(self, show_register_value: Callable[[ShowRegSignalData], None]):
+        self.op_thread.show_register_value.connect(show_register_value)
+
+    def connect_highlight_register_at_addr(self, highlight_register_at_addr: Callable[[str], None]):
+        self.op_thread.highlight_register_at_addr.connect(highlight_register_at_addr)
+
+    def connect_re_read_all_registers(self, re_read_all_registers: Callable[[], None]):
+        self.op_thread.request_re_read_all_registers.connect(re_read_all_registers)
+
+    def connect_highlight_off(self, highlight_off: Callable[[], None]):
+        self.op_thread.request_highlight_off.connect(highlight_off)
 
     def change_read_register_address(self, address: str):
         self.read_register_address_str = address
+
+    def change_read_register_num_bytes(self, num_bytes: str):
+        self.read_register_num_bytes = int(num_bytes)
 
     def device_address_changed(self, device_address: str):
         if device_address != "":
@@ -43,6 +70,7 @@ class App:
                 self._i2c_driver = DummyI2CMaster()
             else:
                 self._i2c_driver = I2CMasterI2CDriver(I2CDriver(self.port))
+                self.op_thread._i2c_driver = self._i2c_driver
                 for c in self.i2c_master_changed:
                     c(self._i2c_driver)
 
@@ -59,14 +87,16 @@ class App:
 
         reg_addr = get_reg_addr()
         if reg_addr is not None:
-            self.read_register_at_addr(reg_addr)
+            self.op_thread.commands.put(ReadRegister(
+                self.device_address, reg_addr, num_bytes=self.read_register_num_bytes, highlight=True
+            ))
+            self.op_thread.commands.put(HighlightOff(delay_millis=300))
 
-    def read_register_at_addr(self, reg_addr: int) -> None:
-        try:
-            regval = self.i2c.read_register(self.device_address, reg_addr)
-            if regval is None:
-                self.show_error(f"Failed to read register at address 0x{reg_addr:X}")
-            else:
-                self.show_read_register_results(f"0x{reg_addr:02X}", f"0x{regval.uint:02X}", regval.bin)
-        except Exception as ex:
-            self.show_error(f"{ex}")
+    def re_read_register_at_addr(self, reg_addr: int, num_bytes: int, highlight: bool = True) -> None:
+        if self.device_address == -1:
+            self.show_error("Please select device address to read registers from")
+        else:
+            self.op_thread.commands.put(ReadRegister(
+                device_address=self.device_address, register_address=reg_addr, num_bytes=num_bytes, highlight=highlight
+            ))
+            self.op_thread.commands.put(HighlightOff(delay_millis=300))
