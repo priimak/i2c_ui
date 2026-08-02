@@ -1,6 +1,13 @@
 from PySide6.QtWidgets import QMenu, QMenuBar, QMessageBox, QWidget
+
 from i2cdgui import __version__
 from i2cdgui.app import App
+from i2cdgui.projects_gui import (
+    DeleteProjectDialog,
+    NewProjectDialog,
+    OpenProjectDialog,
+    SaveAsProjectDialog,
+)
 
 
 class FileMenu(QMenu):
@@ -10,32 +17,38 @@ class FileMenu(QMenu):
         def show_settings_window():
             pass
 
-        self.addAction("&New Project", show_settings_window)
-        self.addAction("&Save As Project", show_settings_window)
-        self.addAction("&Open Project", show_settings_window)
+        def delete_project():
+            if app.project.name == "default":
+                app.show_error(f"Project [{app.project.name}] cannot be deleted.")
+                app.update_project_selector_current_project(app.project.name)
+            else:
+                DeleteProjectDialog(app, app.project.name).exec()
+
+        self.addAction("&New Project", lambda: NewProjectDialog(app).exec())
+        self.addAction("&Save As Project", lambda: SaveAsProjectDialog(app).exec())
+        self.addAction("&Open Project", lambda: OpenProjectDialog(app).exec())
+        self.addAction("&Delete Project", delete_project)
         self.addSeparator()
-        self.addAction("&Settings", show_settings_window)
+        self.addAction("S&ettings", show_settings_window)
         self.addSeparator()
         self.addAction("&Quit", lambda: app.exit_application[0]())
 
 
 class HelpMenu(QMenu):
-    def __init__(self, parent: QMenuBar):
+    def __init__(self, parent: QWidget):
         super().__init__("&Help", parent)
 
-        # In QMessageBox.about(parent = None, ...) will place message window at the center of the screen
-        self.addAction(  # pyright: ignore [reportCallIssue]
+        self.addAction(
             "&About",
             lambda: QMessageBox.about(
-                None,  # pyright: ignore [reportArgumentType]
+                parent,
                 "About",
-                f"<html><H2>I2C GUI</H2><H4>Version: {__version__}</H4><br/>"
-                "<p style=\"font-size:14px;\">“We are at the very beginning of time for the human race. "
-                "It is not unreasonable that we grapple with problems. But there are tens of thousands of "
-                "years in the future. Our responsibility is to do what we can, learn what we can, improve "
-                "the solutions, and pass them on.”  "
-                "</br>&nbsp;&nbsp;&nbsp;&nbsp;- <em>Richard P. Feynman </em></p></html>"
-            )
+                f"<html><H2>I2C GUI</H2><H4>Version: {__version__}</H4>"
+                '<p style="font-size:14px;">"While there is life there is hope. I beg to assert...that '
+                "as long as a man's heart beats, as long as a man's flesh quivers, I do not allow that a being "
+                'gifted with thought and will can allow himself to despair."</br>'
+                "&nbsp;&nbsp;&nbsp;&nbsp;- <em>Jules Verne, Journey to the Center of the Earth</em></html>",
+            ),
         )
 
 
