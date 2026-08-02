@@ -5,16 +5,12 @@ from PySide6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
     QPersistentModelIndex,
-    QRect,
-    QSize,
     Qt,
 )
-from PySide6.QtGui import QKeyEvent, QMouseEvent, QPainter, QTextDocument
+from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QItemDelegate,
     QLabel,
-    QStyleOptionViewItem,
     QTableView,
     QTableWidget,
 )
@@ -22,6 +18,7 @@ from pytide6 import Dialog, HBoxPanel, Label, PushButton, RichTextLabel, VBoxLay
 from pytide6.inputs import LineEdit
 
 from i2cdgui.app import App
+from i2cdgui.gui_tools import Txt2HTMLDelegate
 from i2cdgui.project import PROJECT_VALID_CHAR_RE
 
 
@@ -83,9 +80,7 @@ class ProjectsModel(QAbstractTableModel):
     def columnCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return 1
 
-    def data(
-        self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...
-    ) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             return self.project_names_to_display[index.row()]
         else:
@@ -93,37 +88,6 @@ class ProjectsModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-
-
-class Txt2HTMLDelegate(QItemDelegate):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def mk_text_document(self, text: str) -> QTextDocument:
-        document = QTextDocument()
-        document.setHtml(text)
-        document.setDocumentMargin(1)
-        return document
-
-    def drawDisplay(
-        self,
-        painter: QPainter,
-        option: QStyleOptionViewItem,
-        rect: QRect,
-        text: str,
-        /,
-    ) -> None:
-        document = self.mk_text_document(text)
-        painter.save()
-        painter.translate(rect.topLeft())
-        document.drawContents(painter)
-        painter.restore()
-
-    def sizeHint(
-        self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
-    ) -> QSize:
-        data = index.data(Qt.ItemDataRole.DisplayRole)
-        return self.mk_text_document(data).size().toSize()
 
 
 class ProjectTableView(QTableView):

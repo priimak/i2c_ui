@@ -3,7 +3,7 @@ from collections.abc import Callable
 from i2c_api import I2CMaster
 from i2capi_i2cdriver import I2CMasterI2CDriver
 from i2cdriver import I2CDriver
-from PySide6.QtWidgets import QMainWindow
+from PySide6.QtWidgets import QApplication, QMainWindow
 from sprats.config import AppPersistence
 
 from i2cdgui.dummy_i2cmaster import DummyI2CMaster
@@ -13,10 +13,11 @@ from i2cdgui.reg_read_results import ShowRegSignalData
 
 
 class App:
-    def __init__(self, persistence: AppPersistence):
+    def __init__(self, persistence: AppPersistence, q_application: QApplication):
         self._i2c_driver: I2CMaster | None = None
         self.port: str | None = None
         self.persistence = persistence
+        self.q_application = q_application
         self.i2c_master_changed: list[Callable[[I2CMaster], None]] = []
 
         self.device_address: int = -1

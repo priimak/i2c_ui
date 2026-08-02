@@ -10,6 +10,7 @@ from pytide6 import ComboBox, HBoxPanel, MainWindow, VBoxPanel, W, set_geometry
 from pytide6.palette import Palette
 from sprats.config import AppPersistence
 
+from i2cdgui.actions import FindActionDialog
 from i2cdgui.app import App
 from i2cdgui.commands_panel import CommandsPanel
 from i2cdgui.i2c_op_thread import Quit
@@ -33,10 +34,6 @@ class COMPortSelector(ComboBox):
 
         self.currentTextChanged.connect(self.app.set_port)
         self.currentTextChanged.emit(self.currentText())
-
-
-# class ProjectSelector(ComboBox):
-#     def __init__(self, app: App):
 
 
 class InfoPanel(HBoxPanel):
@@ -177,8 +174,8 @@ class I2CDriverWindow(MainWindow):
             event.key() == Qt.Key.Key_A
             and event.modifiers() == Qt.KeyboardModifier.ControlModifier
         ):
-            print(f"keyPressEvent {event}")
-            # TODO: Add code to show list of commands
+            FindActionDialog(self.app).exec()
+
         super().keyPressEvent(event)
 
     def exit_application(self):
@@ -228,7 +225,7 @@ def main():
     screen_width, screen_height = screen_dim.width(), screen_dim.height()
 
     try:
-        application = App(persistence)
+        application = App(persistence, app)
         win = I2CDriverWindow(screen_dim=(screen_width, screen_height), app=application)
         application._main_window = win
         win.show()
