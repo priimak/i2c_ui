@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QMenu, QMenuBar, QMessageBox, QWidget
 
 from i2cdgui import __version__
+from i2cdgui.actions import FindActionDialog
 from i2cdgui.app import App
 from i2cdgui.projects_gui import (
     DeleteProjectDialog,
@@ -35,9 +36,12 @@ class FileMenu(QMenu):
 
 
 class HelpMenu(QMenu):
-    def __init__(self, parent: QWidget):
+    def __init__(self, parent: QWidget, app: App):
         super().__init__("&Help", parent)
 
+        self.addAction(
+            "Find Action... Ctrl+Shift+A", lambda: FindActionDialog(app).exec()
+        )
         self.addAction(
             "&About",
             lambda: QMessageBox.about(
@@ -56,4 +60,4 @@ class MainMenuBar(QMenuBar):
     def __init__(self, app: App, dialogs_parent: QWidget) -> None:
         super().__init__(dialogs_parent)
         self.addMenu(FileMenu(self, app))
-        self.addMenu(HelpMenu(self))
+        self.addMenu(HelpMenu(self, app))

@@ -128,9 +128,6 @@ class I2CDriverWindow(MainWindow):
         self.app = app
         self.info_panel = InfoPanel(app)
 
-        # if self.info_panel.com_port_selector.count() == 0:
-        #     self.show_error("I2C Master device not found")
-
         self.hsplitter = QSplitter(Qt.Orientation.Horizontal)
         self.hsplitter.setChildrenCollapsible(False)
         self.hsplitter.setHandleWidth(8)
@@ -170,13 +167,14 @@ class I2CDriverWindow(MainWindow):
         self.app.exit_application[0] = self.exit_application
 
     def keyPressEvent(self, event: QtGui.QKeyEvent, /) -> None:
-        if (
-            event.key() == Qt.Key.Key_A
-            and event.modifiers() == Qt.KeyboardModifier.ControlModifier
+        if event.key() == Qt.Key.Key_A and (
+            event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            or event.modifiers()
+            == (Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.ControlModifier)
         ):
             FindActionDialog(self.app).exec()
-
-        super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
 
     def exit_application(self):
         self.close()
@@ -204,7 +202,7 @@ class I2CDriverWindow(MainWindow):
             )
 
     def show_error(self, message: str) -> None:
-        QMessageBox.critical(self, "Error", message)
+        QMessageBox.critical(None, "Error", message)
 
 
 def main():

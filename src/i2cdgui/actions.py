@@ -2,6 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from PySide6 import QtCore
 from PySide6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
@@ -9,7 +10,8 @@ from PySide6.QtCore import (
     QSize,
     Qt,
 )
-from PySide6.QtWidgets import QAbstractItemView, QTableView
+from PySide6.QtGui import QIcon, QKeyEvent
+from PySide6.QtWidgets import QAbstractItemView, QLineEdit, QTableView
 from pytide6 import Dialog, Label, VBoxLayout
 from pytide6.inputs import LineEdit
 
@@ -28,18 +30,26 @@ class Action:
     name: str
     action: Callable[[App], Any]
 
+
 ACTIONS = [
     Action("Create new project", lambda app: NewProjectDialog(app).exec()),
-    Action("Delete currently opened project", lambda app: DeleteProjectDialog(app, app.project.name).exec()),
+    Action(
+        "Delete currently active project",
+        lambda app: DeleteProjectDialog(app, app.project.name).exec(),
+    ),
     Action("Exit/Quit application", lambda app: app.exit_application[0]()),
     Action("Open project", lambda app: OpenProjectDialog(app).exec()),
     Action("Read register", None),
-    Action("Save currently open project under a different name", lambda app: SaveAsProjectDialog(app).exec()),
+    Action(
+        "Save currently open project under a different name",
+        lambda app: SaveAsProjectDialog(app).exec(),
+    ),
     Action("Write register", None),
     Action("Define new register", None),
     Action("Open regList editor", None),
     Action("Add new variable to watch list", None),
 ]
+
 
 class ActionsModel(QAbstractTableModel):
     def __init__(self, tv: QTableView, app: App):
@@ -57,7 +67,9 @@ class ActionsModel(QAbstractTableModel):
     def columnCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return 1
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...) -> Any:
+    def data(
+        self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...
+    ) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             return self.actions_to_display[index.row()].name
         else:
@@ -69,10 +81,8 @@ class ActionsModel(QAbstractTableModel):
     def apply_filter(self, char_filter: list[str]):
         self.beginResetModel()
         self.actions_to_display.clear()
-        # self.project_names_raw.clear()
         if char_filter == []:
             self.actions_to_display = ACTIONS.copy()
-            # self.project_names_raw = self.project_names_to_display.copy()
             self.endResetModel()
             self.tv.selectRow(0)
             return
@@ -91,15 +101,13 @@ class ActionsModel(QAbstractTableModel):
                     new_label += action.name[i]
             if j == len(char_filter):
                 self.actions_to_display.append(Action(new_label, action.action))
-                # self.project_names_raw.append(project_name)
 
         self.endResetModel()
         self.tv.selectRow(0)
 
 
-
 class ActionsTableView(QTableView):
-    def __init__(self, app: App, selection_filter_changed: Callable[[list[str]], None]):
+    def __init__(self, parent: Dialog, app: App):
         super().__init__(None)
 
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -110,23 +118,93 @@ class ActionsTableView(QTableView):
         self.actions_model = ActionsModel(self, app)
         self.setModel(self.actions_model)
         self.setItemDelegate(Txt2HTMLDelegate())
-        self.selection_filter_changed = selection_filter_changed
+
+        def do_action(index: QModelIndex):
+            parent.close()
+            self.actions_model.actions_to_display[index.row()].action(app)
+
+        self.doubleClicked.connect(do_action)
+
+
+class SearchField(LineEdit):
+    def __init__(
+        self,
+        parent: Dialog,
+        /,
+        app: App,
+        on_text_change: Callable[[str], None],
+        actions_table: ActionsTableView,
+    ):
+        super().__init__(on_text_change=on_text_change)
+        self.parent = parent
+        self.app = app
+        self.actions_table = actions_table
+
+        # place "find" icon on the left side of search text field.
+        self.addAction(
+            QIcon.fromTheme(QIcon.ThemeIcon.EditFind),
+            QLineEdit.ActionPosition.LeadingPosition,
+        )
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        event_key = event.key()
+        match event_key:
+            case Qt.Key.Key_Escape:
+                if self.text() == "":
+                    self.parent.close()
+                else:
+                    self.setText("")
+                    return
+
+            case Qt.Key.Key_Return:
+                selected_rows = self.actions_table.selectedIndexes()
+                if selected_rows == []:
+                    self.parent.close()
+                else:
+                    self.parent.close()
+                    self.actions_table.actions_model.actions_to_display[
+                        selected_rows[0].row()
+                    ].action(self.app)
+                return
+
+            case Qt.Key.Key_Down:
+                selected_rows = self.actions_table.selectedIndexes()
+                if selected_rows == []:
+                    self.actions_table.selectRow(0)
+                else:
+                    next_row = selected_rows[0].row() + 1
+                    if next_row <= self.actions_table.actions_model.rowCount():
+                        self.actions_table.selectRow(next_row)
+                return
+
+            case Qt.Key.Key_Up:
+                selected_rows = self.actions_table.selectedIndexes()
+                if selected_rows == []:
+                    self.actions_table.selectRow(0)
+                else:
+                    next_row = selected_rows[0].row() - 1
+                    if next_row >= 0:
+                        self.actions_table.selectRow(next_row)
+                return
+
+        super().keyPressEvent(event)
 
 
 class FindActionDialog(Dialog):
     def __init__(self, app: App):
         super().__init__(app.main_window, windowTitle="Find Action", modal=True)
+        self.setWindowFlags(
+            QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Window
+        )
         self.app = app
-        actions_table = ActionsTableView(app, None)
-        search_field = LineEdit(on_text_change=lambda x: actions_table.actions_model.apply_filter(list(x)))
-        self.setLayout(VBoxLayout([
-            Label("Find Action"),
-            search_field,
-            actions_table
-        ]))
+        actions_table = ActionsTableView(self, app)
+        search_field = SearchField(
+            self,
+            app=app,
+            on_text_change=lambda x: actions_table.actions_model.apply_filter(list(x)),
+            actions_table=actions_table,
+        )
+        self.setLayout(VBoxLayout([Label("Find Action"), search_field, actions_table]))
         search_field.setFocus()
         screen_dim: QSize = app.q_application.primaryScreen().size()
-        screen_width, screen_height = screen_dim.width(), screen_dim.height()
-        self.resize(int(screen_width/2), int(screen_height/3))
-
-
+        self.resize(int(screen_dim.width() / 2), int(screen_dim.height() / 3))
