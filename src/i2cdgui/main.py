@@ -5,7 +5,13 @@ import serial.tools.list_ports as slp
 from PySide6 import QtGui
 from PySide6.QtCore import QByteArray, QSize
 from PySide6.QtGui import QCloseEvent, QPalette, Qt
-from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QSplitter
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QMessageBox,
+    QSplitter,
+    QTabWidget,
+)
 from pytide6 import ComboBox, HBoxPanel, MainWindow, VBoxPanel, W, set_geometry
 from pytide6.palette import Palette
 from sprats.config import AppPersistence
@@ -140,10 +146,18 @@ class I2CDriverWindow(MainWindow):
 
         cpanel = CommandsPanel(app)
         cpanel.setBackgroundColor("orange")
+
+        in_right_panel = QTabWidget()
+        in_right_panel.setDocumentMode(True)
+        in_right_panel.addTab(
+            VBoxPanel(background_color="lightpink"), "Variables and Commands"
+        )
+        in_right_panel.addTab(VBoxPanel(background_color="lightyellow"), "RegList")
+
         right_panel = VBoxPanel(
             widgets=[
                 VBoxPanel([cpanel], background_color="black", margins=1),
-                W(VBoxPanel(background_color="pink"), stretch=2),
+                W(in_right_panel, stretch=2),
             ],
             margins=0,
         )
@@ -167,10 +181,8 @@ class I2CDriverWindow(MainWindow):
         self.app.exit_application[0] = self.exit_application
 
     def keyPressEvent(self, event: QtGui.QKeyEvent, /) -> None:
-        if event.key() == Qt.Key.Key_A and (
-            event.modifiers() == Qt.KeyboardModifier.ControlModifier
-            or event.modifiers()
-            == (Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.ControlModifier)
+        if event.key() == Qt.Key.Key_A and event.modifiers() == (
+            Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.ControlModifier
         ):
             FindActionDialog(self.app).exec()
         else:

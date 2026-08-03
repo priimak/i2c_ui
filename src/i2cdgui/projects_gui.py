@@ -61,7 +61,7 @@ class ProjectsModel(QAbstractTableModel):
                     and char_filter[j].lower() == project_name[i].lower()
                 ):
                     j += 1
-                    new_label += f'<span style="background-color: #0000ff; color: #ffffff;">{project_name[i]}</span>'
+                    new_label += f'<span style="background-color: pink; color: #000000;">{project_name[i]}</span>'
                 else:
                     new_label += project_name[i]
             if j == len(char_filter):
@@ -80,7 +80,9 @@ class ProjectsModel(QAbstractTableModel):
     def columnCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return 1
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...) -> Any:
+    def data(
+        self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...
+    ) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             return self.project_names_to_display[index.row()]
         else:

@@ -32,22 +32,24 @@ class Action:
 
 
 ACTIONS = [
+    Action("Add new variable to watch list", None),
     Action("Create new project", lambda app: NewProjectDialog(app).exec()),
+    Action("Define new register", None),
     Action(
         "Delete currently active project",
         lambda app: DeleteProjectDialog(app, app.project.name).exec(),
     ),
     Action("Exit/Quit application", lambda app: app.exit_application[0]()),
+    Action("Export project into file", None),
+    Action("Import project from file", None),
     Action("Open project", lambda app: OpenProjectDialog(app).exec()),
+    Action("Open regList editor", None),
     Action("Read register", None),
     Action(
         "Save currently open project under a different name",
         lambda app: SaveAsProjectDialog(app).exec(),
     ),
     Action("Write register", None),
-    Action("Define new register", None),
-    Action("Open regList editor", None),
-    Action("Add new variable to watch list", None),
 ]
 
 
@@ -96,7 +98,7 @@ class ActionsModel(QAbstractTableModel):
                     and char_filter[j].lower() == action.name[i].lower()
                 ):
                     j += 1
-                    new_label += f'<span style="background-color: #0000ff; color: #ffffff;">{action.name[i]}</span>'
+                    new_label += f'<span style="background-color: pink; color: #000000;">{action.name[i]}</span>'
                 else:
                     new_label += action.name[i]
             if j == len(char_filter):
@@ -107,9 +109,15 @@ class ActionsModel(QAbstractTableModel):
 
 
 class ActionsTableView(QTableView):
-    def __init__(self, parent: Dialog, app: App):
+    def __init__(
+        self,
+        parent: Dialog,
+        app: App,
+        pass_key_press_event: Callable[[], Callable[[QKeyEvent], None]],
+    ):
         super().__init__(None)
-
+        self.parent: Dialog = parent
+        self.pass_key_press_event = pass_key_press_event
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.horizontalHeader().setStretchLastSection(True)
@@ -124,6 +132,9 @@ class ActionsTableView(QTableView):
             self.actions_model.actions_to_display[index.row()].action(app)
 
         self.doubleClicked.connect(do_action)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        self.pass_key_press_event()(event)
 
 
 class SearchField(LineEdit):
@@ -197,14 +208,21 @@ class FindActionDialog(Dialog):
             QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Window
         )
         self.app = app
-        actions_table = ActionsTableView(self, app)
-        search_field = SearchField(
+        actions_table = ActionsTableView(
+            self, app, pass_key_press_event=self.pass_key_press_event
+        )
+        self.search_field = SearchField(
             self,
             app=app,
             on_text_change=lambda x: actions_table.actions_model.apply_filter(list(x)),
             actions_table=actions_table,
         )
-        self.setLayout(VBoxLayout([Label("Find Action"), search_field, actions_table]))
-        search_field.setFocus()
+        self.setLayout(
+            VBoxLayout([Label("Find Action"), self.search_field, actions_table])
+        )
+        self.search_field.setFocus()
         screen_dim: QSize = app.q_application.primaryScreen().size()
         self.resize(int(screen_dim.width() / 2), int(screen_dim.height() / 3))
+
+    def pass_key_press_event(self) -> Callable[[QKeyEvent], None]:
+        return self.search_field.keyPressEvent
