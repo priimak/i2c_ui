@@ -23,6 +23,7 @@ from i2cdgui.projects_gui import (
     OpenProjectDialog,
     SaveAsProjectDialog,
 )
+from i2cdgui.reg_def_editor import DefRegEditor
 
 
 @dataclass(slots=True, frozen=True)
@@ -34,7 +35,10 @@ class Action:
 ACTIONS = [
     Action("Add new variable to watch list", None),
     Action("Create new project", lambda app: NewProjectDialog(app).exec()),
-    Action("Define new register", None),
+    Action(
+        "Define new register",
+        lambda app: DefRegEditor(app, windowTitle="New Register").exec(),
+    ),
     Action(
         "Delete currently active project",
         lambda app: DeleteProjectDialog(app, app.project.name).exec(),
