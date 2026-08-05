@@ -1,10 +1,12 @@
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
+from functools import reduce
 
 from PySide6 import QtGui
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QRegularExpressionValidator, Qt
-from PySide6.QtWidgets import QFrame, QWidget
+from PySide6.QtWidgets import QFrame, QLayoutItem
 from pytide6 import (
     CheckBox,
     ComboBox,
@@ -18,14 +20,74 @@ from pytide6 import (
 )
 from pytide6.inputs import LineEdit
 from rgscore import FieldDef, Register
+from sprats.collections import Variable
 
 from i2cdgui.app import App
+
+
+class FractionalInput(LineEdit):
+    def __init__(self, value: str, on_text_change: Callable[[str], None] | None = None):
+        super().__init__(
+            text=value,
+            with_fixed_width_for_text="00",
+            validator=QRegularExpressionValidator("^[0-9]{0,2}$"),
+            on_text_change=on_text_change,
+        )
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def reformat_input_text(self):
+        if self.text() == "":
+            self.setText("0")
+
+    def focusOutEvent(self, event: QtGui.QFocusEvent) -> None:
+        self.reformat_input_text()
+        super().focusOutEvent(event)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        if event.key() == Qt.Key.Key_Return:
+            self.reformat_input_text()
+
+        super().keyPressEvent(event)
+
+
+class FieldNameInput(LineEdit):
+    def __init__(self, value: str, on_text_change: Callable[[str], None] | None = None):
+        super().__init__(
+            text=value,
+            with_fixed_width_for_text="Very Long Field Name",
+            validator=QRegularExpressionValidator("^[a-zA-Z_]?[a-zA-Z0-9_]*$"),
+            on_text_change=on_text_change,
+        )
+
+
+@dataclass
+class FieldDevGUIElements:
+    field_name_input_field: FieldNameInput
+    checkboxes: list[CheckBox]
+    width_label: Label
+    rw_selector: ComboBox
+    signed_selector: ComboBox
+    fractional_input_field: FractionalInput
+
+
+@dataclass
+class RegisterPrototype:
+    name: str
+    address: int | None
+    width: int
+    model: list[FieldDef]
+    gui_model: list[FieldDevGUIElements]
+
+    def set_name(self, name: str):
+        self.name = name
 
 
 class AddressInput(LineEdit):
     valid_address_re = re.compile("^(0x)?[0-9a-fA-F]+$]]")
 
-    def __init__(self, register: Register, set_address_func: Callable[[str], None]):
+    def __init__(
+        self, register: RegisterPrototype, set_address_func: Callable[[str], None]
+    ):
         super().__init__(
             text="" if register.address is None else f"0x{register.address:04X}",
             with_fixed_width_for_text="0xFFFF",
@@ -52,27 +114,29 @@ class AddressInput(LineEdit):
 
 
 class DefRegEditor(Dialog):
-    def __init__(self, app: App, *, windowTitle: str | None = None):
+    def __init__(self, app: App, *, width: int, windowTitle: str | None = None):
         super().__init__(app.main_window, windowTitle=windowTitle, modal=True)
         self.app = app
-        self.register = Register(
-            8,
-            name=None,
+        self.cb_togle_enabled = True
+        self.register_proto = RegisterPrototype(
+            name="",
+            address=None,
+            width=width,
             model=[
-                FieldDef.value_of("field_name@[7:0]U8.0#rw"),
+                FieldDef(name="", offset=0, signed="U", width=0, fractional=0, rw=True)
             ],
+            gui_model=[],
         )
-        name = "" if self.register.name is None else self.register.name
-        self.register.width = 8 * (self.register.width // 8) + (
-            8 if (self.register.width % 8) > 0 else 0
+        name = "" if self.register_proto.name is None else self.register_proto.name
+        self.register_proto.width = 8 * (self.register_proto.width // 8) + (
+            8 if (self.register_proto.width % 8) > 0 else 0
         )
         self.new_register_address = ""
 
         def set_new_register_address(addr: str):
             self.new_register_address = addr
 
-        self.fields_panel = VBoxPanel(margins=0)
-        self.build_fields_panel()
+        self.fields_panel = self.build_fields_panel(VBoxPanel(margins=0))
 
         def mk_line():
             line = QFrame()
@@ -80,37 +144,52 @@ class DefRegEditor(Dialog):
             line.setFrameShadow(QFrame.Shadow.Sunken)
             return line
 
+        def add_new_field():
+            self.remove_all_fields_gui_elements()
+            self.register_proto.model.append(
+                FieldDef(name="", offset=0, signed="U", width=0, fractional=0, rw=True)
+            )
+            self.register_proto.gui_model.clear()
+            self.build_fields_panel(self.fields_panel)
+
         self.setLayout(
             VBoxLayout(
                 [
                     HBoxPanel(
                         [
-                            Label("Register Name"),
+                            Label("Name"),
                             LineEdit(
                                 name,
-                                on_text_change=self.register.set_name,
+                                on_text_change=self.register_proto.set_name,
                                 with_fixed_width_for_text="Very Long Register Name",
                             ),
                             Label("  Addr"),
                             AddressInput(
-                                self.register, set_address_func=set_new_register_address
+                                self.register_proto,
+                                set_address_func=set_new_register_address,
                             ),
-                            Label("  Width"),
-                            ComboBox(
-                                items=["8", "16", "24", "32"],
-                                current_selection=f"{self.register.width}",
+                            Label(
+                                f"  This register is {self.register_proto.width} bits wide"
                             ),
-                            W(QWidget(), stretch=1),
+                            W(stretch=1),
                         ],
                         margins=0,
                     ),
                     mk_line(),
+                    HBoxPanel(
+                        [
+                            Label("Fields"),
+                            PushButton("Add New Field", on_clicked=add_new_field),
+                            W(stretch=1),
+                        ],
+                        margins=0,
+                    ),
                     self.fields_panel,
-                    W(QWidget(), stretch=1),
+                    W(stretch=1),
                     mk_line(),
                     HBoxPanel(
                         [
-                            W(QWidget(), stretch=1),
+                            W(stretch=1),
                             PushButton("Ok", on_clicked=self.save_register),
                             PushButton("Cancel", on_clicked=self.close),
                         ],
@@ -120,63 +199,237 @@ class DefRegEditor(Dialog):
             )
         )
 
+    def remove_all_fields_gui_elements(self):
+        fields_panel_layout = self.fields_panel.layout()
+        for _ in range(fields_panel_layout.count()):
+            w: QLayoutItem = fields_panel_layout.takeAt(0)
+            w.widget().setParent(None)
+            fields_panel_layout.removeItem(w)
+
+        fields_panel_layout.update()
+
     def save_register(self):
-        if self.register.name is None or self.register.name.strip() == "":
+        if self.register_proto.name is None or self.register_proto.name.strip() == "":
             self.app.show_error("Register must have a name")
-        elif not Register.register_name_re.match(self.register.name):
+        elif not Register.register_name_re.match(self.register_proto.name):
             self.app.show_error(
                 "Register name must not be empty and contain only numbers, letters and (_) underscores."
             )
         elif self.new_register_address.strip() in ["", "0x"]:
             self.app.show_error("Register must have an address")
-
-    def build_fields_panel(self):
-        layout: VBoxLayout = self.fields_panel.layout()
-        wgs = [
-            HBoxPanel(
-                [Label("Fields"), PushButton("Add New Field"), W(QWidget(), stretch=1)],
-                margins=0,
+        elif self.register_proto.model == []:
+            self.app.show_error("Register must have at least one field")
+        elif len([fd for fd in self.register_proto.model if fd.width == 0]) > 0:
+            self.app.show_error(
+                "Every field must have bits that it is picking from the register"
             )
-        ]
-        for field_name in self.register.get_field_names():
-            field_def = self.register.get_field_definition(field_name)
+        elif len([fd for fd in self.register_proto.model if fd.name.strip() == ""]) > 0:
+            self.app.show_error("Every field must have a name")
+
+    def build_fields_panel(self, fields_panel: VBoxPanel) -> VBoxPanel:
+        wgs = []
+
+        def other_used_bits(but_fd: FieldDef) -> set[int]:
+            other_fields = [fd for fd in self.register_proto.model if fd is not but_fd]
+            used_register_bits = [
+                set(range(fd.offset, fd.offset + fd.width)) for fd in other_fields
+            ]
+            return reduce(lambda acc, v: acc | v, used_register_bits, set())
+
+        def mk_bare_cb(field_idx: int, offset: int) -> CheckBox:
+            cb = CheckBox()
+            cb.setStyleSheet("QCheckBox:disabled {background-color: black;}")
+            cb.setProperty("field_idx", field_idx)
+            cb.setProperty("offset", offset)
+            return cb
+
+        for field_idx, field_def in enumerate(self.register_proto.model):
+
+            def mk_rw_setter(fd: FieldDef):
+                def set_rw(value: str):
+                    fd.rw = value == "rw"
+
+                return set_rw
+
+            def mk_signed_setter(fd: FieldDef):
+                def set_signed(value: str):
+                    fd.signed = "S" if value == "Signed" else "U"
+
+                return set_signed
+
+            def mk_fractional_setter(fd: FieldDef):
+                def set_fractional(value: str):
+                    if value == "":
+                        fd.fractional = 0
+                    else:
+                        fd.fractional = int(value)
+
+                return set_fractional
+
+            def mk_field_name_setter(fd: FieldDef):
+                def set_name(value: str):
+                    fd.name = value
+
+                return set_name
+
+            self.register_proto.gui_model.append(
+                FieldDevGUIElements(
+                    field_name_input_field=FieldNameInput(
+                        field_def.name, on_text_change=mk_field_name_setter(field_def)
+                    ),
+                    checkboxes=[
+                        mk_bare_cb(field_idx, offset)
+                        for offset in range(self.register_proto.width)
+                    ],
+                    width_label=Label(f"{field_def.width}."),
+                    rw_selector=ComboBox(
+                        items=["rw", "ro"],
+                        current_selection="rw" if field_def.rw else "ro",
+                        on_text_change=mk_rw_setter(field_def),
+                    ),
+                    signed_selector=ComboBox(
+                        items=["Unsinged", "Signed"],
+                        current_selection=(0 if field_def.signed == "U" else 1),
+                        on_text_change=mk_signed_setter(field_def),
+                    ),
+                    fractional_input_field=FractionalInput(
+                        f"{field_def.fractional}",
+                        on_text_change=mk_fractional_setter(field_def),
+                    ),
+                )
+            )
+        for field_idx, field_def in enumerate(self.register_proto.model):
+            bits_to_disable: set[int] = other_used_bits(field_def)
+            # field_width_label = Label(f"{field_def.width}.")
+
+            def mk_cb(i: int, bits_to_disable: set[int], field_def: FieldDef):
+                cb: CheckBox = self.register_proto.gui_model[field_idx].checkboxes[i]
+                cb.setChecked(field_def.offset <= i <= field_def.end_offset())
+                cb.setEnabled(i not in bits_to_disable)
+
+                def mk_cb_toggled(cbb: CheckBox):
+                    def cb_toggled(on: bool):
+                        if not self.cb_togle_enabled:
+                            return
+
+                        field_idx: int = cbb.property("field_idx")
+                        offset: int = cbb.property("offset")
+                        field_def: FieldDef = self.register_proto.model[field_idx]
+                        if offset == (field_def.end_offset() + 1):
+                            field_def.width += 1
+                        elif offset == field_def.offset - 1:
+                            field_def.offset -= 1
+                            field_def.width += 1
+                        elif field_def.offset < offset <= field_def.end_offset():
+                            field_def.width = offset - field_def.offset
+                        elif field_def.offset == offset:
+                            field_def.offset += 1
+                            field_def.width -= 1
+                        else:
+                            field_def.offset = offset
+                            field_def.width = 1 if on else 0
+
+                        # update numerical type width label
+                        self.register_proto.gui_model[field_idx].width_label.setText(
+                            f"{field_def.width}."
+                        )
+
+                        # now update gui checkboxes
+                        ids_checked = set(
+                            range(field_def.offset, field_def.end_offset() + 1)
+                        )
+                        try:
+                            self.cb_togle_enabled = False
+                            for cb in self.register_proto.gui_model[
+                                field_idx
+                            ].checkboxes:
+                                idx: int = cb.property("offset")
+                                cb.setChecked(idx in ids_checked)
+                        finally:
+                            self.cb_togle_enabled = True
+
+                        # now update other fields disabling checkboxes
+                        for j, other_field_def in enumerate(self.register_proto.model):
+                            if j != field_idx:
+                                bits_to_disable: set[int] = other_used_bits(
+                                    other_field_def
+                                )
+                                for cb in self.register_proto.gui_model[j].checkboxes:
+                                    cb.setEnabled(
+                                        cb.property("offset") not in bits_to_disable
+                                    )
+
+                    return cb_toggled
+
+                cb.toggled.connect(mk_cb_toggled(cb))
+
+                return cb
 
             cbs = [
-                CheckBox(
-                    checked=(i >= field_def.offset and i <= field_def.end_offset())
-                )
-                for i in range(self.register.width)[::-1]
+                mk_cb(i, bits_to_disable, field_def)
+                for i in range(self.register_proto.width)[::-1]
             ]
-            field_width_label = Label(f"{field_def.width}.")
 
-            fractional_input = LineEdit(
-                f"{field_def.fractional}", with_fixed_width_for_text="00"
-            )
+            def mk_delete_action(idx: int) -> Callable[[], None]:
+                def delete_action():
+                    self.remove_all_fields_gui_elements()
+                    del self.register_proto.model[idx]
+                    self.register_proto.gui_model.clear()
+                    self.build_fields_panel(fields_panel)
+
+                return delete_action
 
             wgs.append(
                 HBoxPanel(
                     cbs
                     + [
                         Label(" "),
-                        LineEdit(
-                            field_def.name,
-                            with_fixed_width_for_text="Very Long Field Name",
-                        ),
-                        ComboBox(
-                            items=["rw", "ro"],
-                            current_selection="rw" if field_def.rw else "ro",
-                        ),
-                        ComboBox(
-                            items=["Unsinged", "Signed"],
-                            current_selection=(0 if field_def.signed == "U" else 1),
-                        ),
-                        field_width_label,
-                        fractional_input,
+                        self.register_proto.gui_model[field_idx].field_name_input_field,
+                        self.register_proto.gui_model[field_idx].rw_selector,
+                        self.register_proto.gui_model[field_idx].signed_selector,
+                        self.register_proto.gui_model[field_idx].width_label,
+                        self.register_proto.gui_model[field_idx].fractional_input_field,
                         Label("  "),
-                        W(QWidget(), stretch=1),
-                        PushButton("Delete"),
+                        W(stretch=1),
+                        PushButton("Delete", on_clicked=mk_delete_action(field_idx)),
                     ],
                     margins=0,
                 )
             )
-        layout.addWidgets(wgs)
+        fields_panel.layout().addWidgets(wgs)
+        return fields_panel
+
+
+class NewRegDefDialog(Dialog):
+    def __init__(self, app: App):
+        super().__init__(app.main_window, windowTitle="Create new register", modal=True)
+        self.app = app
+        self.bit_width: Variable[int] = Variable(8, valid_values=[8, 16, 24, 32])
+
+        def open_edit_dialog():
+            self.close()
+            DefRegEditor(
+                app, width=self.bit_width.value, windowTitle="Create new register"
+            ).exec()
+
+        self.setLayout(
+            VBoxLayout(
+                [
+                    HBoxPanel(
+                        [
+                            Label(
+                                "How wide (in number of bits) do you want this register to be?"
+                            ),
+                            ComboBox(reactive_variable=self.bit_width),
+                        ]
+                    ),
+                    HBoxPanel(
+                        [
+                            W(stretch=1),
+                            PushButton("Ok", on_clicked=open_edit_dialog),
+                            PushButton("Cancel", on_clicked=self.close),
+                        ]
+                    ),
+                ]
+            )
+        )
