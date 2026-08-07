@@ -1,9 +1,8 @@
 import time
 from queue import Queue
-from typing import Optional
 
-from PySide6.QtCore import QThread, Signal
 from i2c_api import I2CMaster
+from PySide6.QtCore import QThread, Signal
 
 from i2cdgui.reg_read_results import ShowRegSignalData
 
@@ -15,7 +14,13 @@ class Command:
 class ReadRegister(Command):
     __match_args__ = ("device_address", "register_address", "num_bytes", "highlight")
 
-    def __init__(self, device_address: int, register_address: int, num_bytes: int, highlight: bool):
+    def __init__(
+        self,
+        device_address: int,
+        register_address: int,
+        num_bytes: int,
+        highlight: bool,
+    ):
         self.device_address = device_address
         self.register_address = register_address
         self.num_bytes = num_bytes
@@ -53,27 +58,41 @@ class I2COpThread(QThread):
     def __init__(self, /):
         super().__init__()
         self.commands = Queue()
-        self._i2c_driver: Optional[I2CMaster] = None
+        self._i2c_driver: I2CMaster | None = None
 
     @property
-    def i2c(self) -> Optional[I2CMaster]:
+    def i2c(self) -> I2CMaster | None:
         return self._i2c_driver
 
-    def read_register_at_addr(self, device_address: int, register_address: int,
-                              num_bytes: int, highlight: bool) -> None:
+    def read_register_at_addr(
+        self,
+        device_address: int,
+        register_address: int,
+        num_bytes: int,
+        highlight: bool,
+    ) -> None:
         if device_address == -1:
             self.show_error.emit("Please select device address to read registers from")
         else:
             try:
                 if highlight:
                     self.highlight_register_at_addr.emit(f"0x{register_address:02X}")
-                regval = self.i2c.read_register(device_address, register_address, num_bytes)
+                regval = self.i2c.read_register(
+                    device_address, register_address, num_bytes
+                )
                 if regval is None:
-                    self.show_error.emit(f"Failed to read register at address 0x{register_address:02X}")
+                    self.show_error.emit(
+                        f"Failed to read register at address 0x{register_address:02X}"
+                    )
                 else:
-                    self.show_register_value.emit(ShowRegSignalData(
-                        f"0x{register_address:02X}", f"0x{regval.uint:02X}", regval.bin, highlight
-                    ))
+                    self.show_register_value.emit(
+                        ShowRegSignalData(
+                            f"0x{register_address:02X}",
+                            f"0x{regval.uint:02X}",
+                            regval.bin,
+                            highlight,
+                        )
+                    )
             except Exception as ex:
                 self.show_error.emit(f"{ex}")
 
@@ -81,8 +100,12 @@ class I2COpThread(QThread):
         while True:
             cmd = self.commands.get()
             match cmd:
-                case ReadRegister(device_address, register_address, num_bytes, highlight):
-                    self.read_register_at_addr(device_address, register_address, num_bytes, highlight)
+                case ReadRegister(
+                    device_address, register_address, num_bytes, highlight
+                ):
+                    self.read_register_at_addr(
+                        device_address, register_address, num_bytes, highlight
+                    )
 
                 case RequestReadAllRegisters():
                     if cmd.has_expired():

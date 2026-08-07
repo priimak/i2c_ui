@@ -1,5 +1,5 @@
 from i2c_api import I2CMaster
-from pytide6 import VBoxPanel, W, HBoxPanel, PushButton, Label, ComboBox
+from pytide6 import ComboBox, HBoxPanel, Label, PushButton, VBoxPanel, W
 from pytide6.inputs import LineEdit
 
 from i2cdgui.app import App
@@ -19,8 +19,10 @@ class AddrSelector(ComboBox):
 
 class SpeedSelector(ComboBox):
     def __init__(self, app: App):
-        super().__init__(items=[f"{s} KHz" for s in app.i2c.list_clk_speeds()],
-                         current_selection=app.persistence.config.get_by_xpath("/speed"))
+        super().__init__(
+            items=[f"{s} KHz" for s in app.i2c.list_clk_speeds()],
+            current_selection=app.persistence.config.get_by_xpath("/speed"),
+        )
         self.app = app
         self.app.i2c.set_clk_speed(int(self.currentText()[0:3]))
 
@@ -34,8 +36,10 @@ class SpeedSelector(ComboBox):
 
 class PullUpResistorSelector(ComboBox):
     def __init__(self, app: App):
-        super().__init__(items=app.i2c.list_pullups(),
-                         current_selection=app.persistence.config.get_by_xpath("/pullup"))
+        super().__init__(
+            items=app.i2c.list_pullups(),
+            current_selection=app.persistence.config.get_by_xpath("/pullup"),
+        )
         self.app = app
         self.setCurrentText(self.app.i2c.get_pullup())
 
@@ -53,13 +57,21 @@ class CommandsPanel(VBoxPanel):
         self.pullup_selector = PullUpResistorSelector(app)
         app.i2c_master_changed.append(self.i2c_master_changed)
         self.addWidget(
-            HBoxPanel([
-                W(Label(""), stretch=1), Label("I2C Device Address"), self.addr_selector,
-                PushButton("Scan", on_clicked=self.addr_selector.scan), Label("  |  "),
-                Label("Speed"), self.speed_selector, Label("  |  "),
-                Label("Pullups"), self.pullup_selector,
-                W(Label(""), stretch=1)
-            ])
+            HBoxPanel(
+                [
+                    W(Label(""), stretch=1),
+                    Label("I2C Device Address"),
+                    self.addr_selector,
+                    PushButton("Scan", on_clicked=self.addr_selector.scan),
+                    Label("  |  "),
+                    Label("Speed"),
+                    self.speed_selector,
+                    Label("  |  "),
+                    Label("Pullups"),
+                    self.pullup_selector,
+                    W(Label(""), stretch=1),
+                ]
+            )
         )
 
         reg_addres_input = []
@@ -68,32 +80,51 @@ class CommandsPanel(VBoxPanel):
             app.read_register()
             reg_addres_input[0].selectAll()
 
-        reg_addres_input.append(LineEdit(
-            text=app.read_register_address_str,
-            on_text_change=app.change_read_register_address,
-            on_key_enter=do_read_register
-        ))
+        reg_addres_input.append(
+            LineEdit(
+                text=app.read_register_address_str,
+                on_text_change=app.change_read_register_address,
+                on_key_enter=do_read_register,
+            )
+        )
 
-        panel = VBoxPanel([
-            HBoxPanel([
-                PushButton("Read Register", on_clicked=app.read_register), Label(" Addr:"),
-                reg_addres_input[0],
-                Label(" Num Bytes:"),
-                ComboBox(
-                    items=["1", "2", "3", "4"],
-                    current_selection=f"{app.read_register_num_bytes}",
-                    on_text_change=app.change_read_register_num_bytes
+        panel = VBoxPanel(
+            [
+                HBoxPanel(
+                    [
+                        PushButton("Read Register", on_clicked=app.read_register),
+                        Label(" Addr:"),
+                        reg_addres_input[0],
+                        Label(" Num Bytes:"),
+                        ComboBox(
+                            items=["1", "2", "3", "4"],
+                            current_selection=f"{app.read_register_num_bytes}",
+                            on_text_change=app.change_read_register_num_bytes,
+                        ),
+                        W(Label(""), stretch=1),
+                    ]
                 ),
-                W(Label(""), stretch=1)
-            ]),
-            HBoxPanel([
-                PushButton("Write Register"), Label(" Addr:"), LineEdit(), Label(" Value:"),
-                LineEdit(), Label(" Num Bytes:"),
-                ComboBox(items=["1", "2", "3", "4"], current_selection=f"{app.write_register_num_bytes}"),
-                W(Label(""), stretch=1)
-            ])
-        ], margins=0)
-        self.addWidget(HBoxPanel([W(Label(""), stretch=1), panel, W(Label(""), stretch=1)]))
+                HBoxPanel(
+                    [
+                        PushButton("Write Register"),
+                        Label(" Addr:"),
+                        LineEdit(),
+                        Label(" Value:"),
+                        LineEdit(),
+                        Label(" Num Bytes:"),
+                        ComboBox(
+                            items=["1", "2", "3", "4"],
+                            current_selection=f"{app.write_register_num_bytes}",
+                        ),
+                        W(Label(""), stretch=1),
+                    ]
+                ),
+            ],
+            margins=0,
+        )
+        self.addWidget(
+            HBoxPanel([W(Label(""), stretch=1), panel, W(Label(""), stretch=1)])
+        )
 
     def i2c_master_changed(self, i2c: I2CMaster) -> None:
         self.pullup_selector.clear()

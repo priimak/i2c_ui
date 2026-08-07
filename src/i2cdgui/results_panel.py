@@ -64,6 +64,10 @@ class ResultsTableModel(QAbstractTableModel):
                     if index.row() in self.highlighted_rows
                     else self.default_row_color
                 )
+            else:
+                return None
+        else:
+            return None
 
     def setData(
         self, index: QModelIndex | QPersistentModelIndex, value: Any, role: int = ...

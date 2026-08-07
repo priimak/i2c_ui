@@ -5,7 +5,7 @@ from functools import reduce
 
 from PySide6 import QtGui
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QRegularExpressionValidator, Qt
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import QFrame, QLayoutItem
 from pytide6 import (
     CheckBox,

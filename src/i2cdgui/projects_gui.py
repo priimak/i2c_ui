@@ -98,7 +98,7 @@ class ProjectTableView(QTableView):
         app: App,
         selection_filter_changed: Callable[[list[str]], None],
         open_project: Callable[[], None],
-        close_dialog: Callable[[], None],
+        close_dialog: Callable[[], Any],
     ):
         super().__init__(None)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -123,10 +123,10 @@ class ProjectTableView(QTableView):
             case Qt.Key.Key_Escape:
                 if self.select_chars == []:
                     self.close_dialog()
-                    return
-                self.select_chars.clear()
-                self.projects_model.apply_filter(self.select_chars)
-                self.selection_filter_changed(self.select_chars)
+                else:
+                    self.select_chars.clear()
+                    self.projects_model.apply_filter(self.select_chars)
+                    self.selection_filter_changed(self.select_chars)
             case Qt.Key.Key_Backspace:
                 self.select_chars = self.select_chars[:-1]
                 self.projects_model.apply_filter(self.select_chars)

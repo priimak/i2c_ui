@@ -1,18 +1,22 @@
-from typing import Optional
-
 from bitstring import Bits
 from i2c_api import I2CMaster
 
 
 class DummyI2CMaster(I2CMaster):
-    def write(self, address: int, data: Bits | str | int | list[int], num_bytes: int | None = None) -> bool:
+    def write(
+        self,
+        address: int,
+        data: Bits | str | int | list[int],
+        num_bytes: int | None = None,
+    ) -> bool:
         return False
 
-    def read(self, address: int, num_bytes: int = 1) -> Optional[Bits]:
+    def read(self, address: int, num_bytes: int = 1) -> Bits | None:
         return None
 
-    def read_register(self, address: int, register: int, num_bytes: int = 1, use_restart: bool = True) \
-            -> Optional[Bits]:
+    def read_register(
+        self, address: int, register: int, num_bytes: int = 1, use_restart: bool = True
+    ) -> Bits | None:
         return None
 
     def scan(self) -> list[int]:
