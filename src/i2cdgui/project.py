@@ -21,6 +21,9 @@ class Project:
         self.results_path = self.dir / "results.json"
 
         self.reg_list = RegList()
+        if not self.reg_list_path.exists():
+            self.save_reglist()
+
         self.results: list[list[str]] = []
 
     def copy_to(self, target_project: "Project"):

@@ -78,21 +78,51 @@ class RegisterPrototype:
     model: list[FieldDef]
     gui_model: list[FieldDevGUIElements]
 
+    __address_str: str = ""
+
     def set_name(self, name: str):
         self.name = name
+
+    def set_address(self, address: str) -> None:
+        self.__address_str = address
+        self.address = 0 if address in ["", "0x"] else int(address, 16)
+
+    def to_register(self) -> Register:
+        if self.name is None or self.name.strip() == "":
+            raise ValueError("Register must have a name")
+        elif not Register.register_name_re.match(self.name):
+            raise ValueError(
+                "Register name must not be empty and contain only numbers, letters and (_) underscores."
+            )
+        elif self.__address_str in ["", "0x"]:
+            raise ValueError("Register must have an address")
+        elif self.model == []:
+            raise ValueError("Register must have at least one field")
+        elif len([fd for fd in self.model if fd.width == 0]) > 0:
+            raise ValueError(
+                "Every field must have bits that it is picking from the register"
+            )
+        elif len([fd for fd in self.model if fd.name.strip() == ""]) > 0:
+            raise ValueError("Every field must have a name")
+        else:
+            return Register(
+                bit_len=self.width,
+                address=self.address,
+                name=self.name,
+                link=None,
+                model=self.model,
+            )
 
 
 class AddressInput(LineEdit):
     valid_address_re = re.compile("^(0x)?[0-9a-fA-F]+$]]")
 
-    def __init__(
-        self, register: RegisterPrototype, set_address_func: Callable[[str], None]
-    ):
+    def __init__(self, register: RegisterPrototype):
         super().__init__(
             text="" if register.address is None else f"0x{register.address:04X}",
             with_fixed_width_for_text="0xFFFF",
             validator=QRegularExpressionValidator("^(0x)?[0-9a-fA-F]{0,4}$"),
-            on_text_change=set_address_func,
+            on_text_change=register.set_address,
         )
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -133,9 +163,6 @@ class DefRegEditor(Dialog):
         )
         self.new_register_address = ""
 
-        def set_new_register_address(addr: str):
-            self.new_register_address = addr
-
         self.fields_panel = self.build_fields_panel(VBoxPanel(margins=0))
 
         def mk_line():
@@ -164,10 +191,7 @@ class DefRegEditor(Dialog):
                                 with_fixed_width_for_text="Very Long Register Name",
                             ),
                             Label("  Addr"),
-                            AddressInput(
-                                self.register_proto,
-                                set_address_func=set_new_register_address,
-                            ),
+                            AddressInput(self.register_proto),
                             Label(
                                 f"  This register is {self.register_proto.width} bits wide"
                             ),
@@ -179,7 +203,11 @@ class DefRegEditor(Dialog):
                     HBoxPanel(
                         [
                             Label("Fields"),
-                            PushButton("Add New Field", on_clicked=add_new_field),
+                            PushButton(
+                                "Add New Field",
+                                on_clicked=add_new_field,
+                                auto_default=False,
+                            ),
                             W(stretch=1),
                         ],
                         margins=0,
@@ -190,8 +218,12 @@ class DefRegEditor(Dialog):
                     HBoxPanel(
                         [
                             W(stretch=1),
-                            PushButton("Ok", on_clicked=self.save_register),
-                            PushButton("Cancel", on_clicked=self.close),
+                            PushButton(
+                                "Ok", on_clicked=self.save_register, auto_default=False
+                            ),
+                            PushButton(
+                                "Cancel", on_clicked=self.close, auto_default=False
+                            ),
                         ],
                         margins=0,
                     ),
@@ -209,22 +241,12 @@ class DefRegEditor(Dialog):
         fields_panel_layout.update()
 
     def save_register(self):
-        if self.register_proto.name is None or self.register_proto.name.strip() == "":
-            self.app.show_error("Register must have a name")
-        elif not Register.register_name_re.match(self.register_proto.name):
-            self.app.show_error(
-                "Register name must not be empty and contain only numbers, letters and (_) underscores."
-            )
-        elif self.new_register_address.strip() in ["", "0x"]:
-            self.app.show_error("Register must have an address")
-        elif self.register_proto.model == []:
-            self.app.show_error("Register must have at least one field")
-        elif len([fd for fd in self.register_proto.model if fd.width == 0]) > 0:
-            self.app.show_error(
-                "Every field must have bits that it is picking from the register"
-            )
-        elif len([fd for fd in self.register_proto.model if fd.name.strip() == ""]) > 0:
-            self.app.show_error("Every field must have a name")
+        try:
+            register = self.register_proto.to_register()
+            self.app.project.reg_list.add(register)
+            self.close()
+        except Exception as ex:
+            self.app.show_error(f"{ex}")
 
     def build_fields_panel(self, fields_panel: VBoxPanel) -> VBoxPanel:
         wgs = []
@@ -391,7 +413,11 @@ class DefRegEditor(Dialog):
                         self.register_proto.gui_model[field_idx].fractional_input_field,
                         Label("  "),
                         W(stretch=1),
-                        PushButton("Delete", on_clicked=mk_delete_action(field_idx)),
+                        PushButton(
+                            "Delete",
+                            on_clicked=mk_delete_action(field_idx),
+                            auto_default=False,
+                        ),
                     ],
                     margins=0,
                 )
@@ -426,8 +452,12 @@ class NewRegDefDialog(Dialog):
                     HBoxPanel(
                         [
                             W(stretch=1),
-                            PushButton("Ok", on_clicked=open_edit_dialog),
-                            PushButton("Cancel", on_clicked=self.close),
+                            PushButton(
+                                "Ok", on_clicked=open_edit_dialog, auto_default=True
+                            ),
+                            PushButton(
+                                "Cancel", on_clicked=self.close, auto_default=False
+                            ),
                         ]
                     ),
                 ]

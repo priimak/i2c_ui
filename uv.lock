@@ -100,7 +100,7 @@ requires-dist = [
     { name = "i2cdriver", specifier = "==1.0.6" },
     { name = "pyside6", specifier = "==6.11.1" },
     { name = "pytide6", git = "https://github.com/priimak/PyTide6.git?rev=v0.14.1" },
-    { name = "rgscore", git = "https://github.com/priimak/rgscore.git?rev=v0.5.0" },
+    { name = "rgscore", git = "https://github.com/priimak/rgscore.git?rev=master" },
     { name = "usb-monitor" },
 ]
 
@@ -209,8 +209,8 @@ wheels = [
 
 [[package]]
 name = "rgscore"
-version = "0.5.0.post0+git.c9723b51.dirty"
-source = { git = "https://github.com/priimak/rgscore.git?rev=v0.5.0#c9723b51616c4f82e3b169ab147f4a99f65350d3" }
+version = "0.5.0.post1+git.24bbda55.dirty"
+source = { git = "https://github.com/priimak/rgscore.git?rev=master#24bbda551a5929470a7e5e4212dd7f0ad7c3a46e" }
 dependencies = [
     { name = "bitstring" },
     { name = "i2c-api" },
