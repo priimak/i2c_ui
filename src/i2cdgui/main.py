@@ -4,16 +4,14 @@ from typing import override
 import serial.tools.list_ports as slp
 from PySide6 import QtGui
 from PySide6.QtCore import QByteArray, QSize
-from PySide6.QtGui import QCloseEvent, QPalette, Qt
+from PySide6.QtGui import QCloseEvent, Qt
 from PySide6.QtWidgets import (
     QApplication,
-    QLabel,
     QMessageBox,
     QSplitter,
     QTabWidget,
 )
 from pytide6 import ComboBox, HBoxPanel, MainWindow, VBoxPanel, W, set_geometry
-from pytide6.palette import Palette
 from sprats.config import AppPersistence
 
 from i2cdgui.actions import FindActionDialog
@@ -21,11 +19,7 @@ from i2cdgui.app import App
 from i2cdgui.commands_panel import CommandsPanel
 from i2cdgui.i2c_op_thread import Quit
 from i2cdgui.menus import MainMenuBar
-from i2cdgui.projects_gui import (
-    DeleteProjectDialog,
-    NewProjectDialog,
-    OpenProjectDialog,
-)
+from i2cdgui.opened_project_label import OpenedProjectLabel
 from i2cdgui.results_panel import ResultsPanel
 
 
@@ -44,79 +38,12 @@ class COMPortSelector(ComboBox):
 
 class InfoPanel(HBoxPanel):
     def __init__(self, app: App):
-        super().__init__()
-        self.setPalette(Palette(QPalette.ColorRole.Window, "#f1f1f1"))
-        self.setAutoFillBackground(True)
+        super().__init__(background_color="#f1f1f1")
 
         self.com_port_selector = COMPortSelector(app)
-        # opened_project_label = QLabel("Project: ?")
-        # self.layout().addWidget(opened_project_label)
-
-        available_projects = app.projects.list_projects()
-        projects_selector = ComboBox(
-            items=["New Project", "Open Project", "Delete Project"]
-            + available_projects[0:10]
-            + ["..."]
+        self.layout().addWidgets(
+            [OpenedProjectLabel(app), W(stretch=1), self.com_port_selector]
         )
-        projects_selector.insertSeparator(3)
-
-        dispatch_projects_selector_update = [True]
-
-        def projects_selector_dispatcher(_):
-            if dispatch_projects_selector_update[0]:
-                match projects_selector.currentText():
-                    case "New Project":
-                        NewProjectDialog(app).exec()
-                    case "Open Project" | "...":
-                        OpenProjectDialog(app).exec()
-                    case "Delete Project":
-                        if app.project.name == "default":
-                            app.show_error(
-                                f"Project [{app.project.name}] cannot be deleted."
-                            )
-                            app.update_project_selector_current_project(
-                                app.project.name
-                            )
-                        else:
-                            DeleteProjectDialog(app, app.project.name).exec()
-                    case project_name:
-                        if project_name != "" and project_name != app.project.name:
-                            app.open_project(project_name)
-
-        projects_selector.currentTextChanged.connect(projects_selector_dispatcher)
-
-        self.layout().addWidget(QLabel("Project:"))
-        self.layout().addWidget(projects_selector)
-
-        self.layout().addStretch(stretch=1)
-        self.layout().addWidget(self.com_port_selector)
-
-        def update_project_selector_current_project(project_name: str):
-            if (
-                dispatch_projects_selector_update[0]
-                and projects_selector.currentText() != project_name
-            ):
-                projects_selector.setCurrentText(project_name)
-
-        app.update_project_selector_current_project = (
-            update_project_selector_current_project
-        )
-
-        def reconstruct_list_of_projects(projects: list[str]):
-            try:
-                dispatch_projects_selector_update[0] = False
-                projects_selector.clear()
-                projects_selector.addItems(
-                    ["New Project", "Open Project", "Delete Project"]
-                    + projects[0:10]
-                    + ["..."]
-                )
-                projects_selector.setCurrentText(app.project.name)
-                projects_selector.insertSeparator(3)
-            finally:
-                dispatch_projects_selector_update[0] = True
-
-        app.project_names_changed = reconstruct_list_of_projects
 
 
 class I2CDriverWindow(MainWindow):

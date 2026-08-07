@@ -37,7 +37,6 @@ class App:
         self.update_project_selector_current_project: Callable[[str], None] = lambda _: (
             None
         )
-        self.project_names_changed: Callable[[list[str]], None] = lambda _: None
         self.request_results_reload: Callable[[], None] = lambda: None
 
         self.op_thread = I2COpThread()
@@ -157,7 +156,6 @@ class App:
         self.request_results_reload()
         self.update_project_selector_current_project(self.project.name)
         self.persistence.config.set_value("last_open_project", name)
-        self.project_names_changed(self.projects.list_projects())
 
     def create_new_project(self, name: str):
         self.projects.new_project(name)
