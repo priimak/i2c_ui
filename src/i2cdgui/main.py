@@ -14,12 +14,13 @@ from PySide6.QtWidgets import (
 from pytide6 import ComboBox, HBoxPanel, MainWindow, VBoxPanel, W, set_geometry
 from sprats.config import AppPersistence
 
-from i2cdgui.actions import FindActionDialog
 from i2cdgui.app import App
 from i2cdgui.commands_panel import CommandsPanel
+from i2cdgui.find_actions_dialog import FindActionDialog
 from i2cdgui.i2c_op_thread import Quit
 from i2cdgui.menus import MainMenuBar
 from i2cdgui.opened_project_label import OpenedProjectLabel
+from i2cdgui.reglist_panel import RegListPanel
 from i2cdgui.results_panel import ResultsPanel
 
 
@@ -79,7 +80,7 @@ class I2CDriverWindow(MainWindow):
         in_right_panel.addTab(
             VBoxPanel(background_color="lightpink"), "Variables and Commands"
         )
-        in_right_panel.addTab(VBoxPanel(background_color="lightyellow"), "RegList")
+        in_right_panel.addTab(RegListPanel(app), "RegList")
 
         right_panel = VBoxPanel(
             widgets=[

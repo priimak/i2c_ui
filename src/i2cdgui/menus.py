@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QMenu, QMenuBar, QMessageBox, QWidget
 
 from i2cdgui import __version__
-from i2cdgui.actions import FindActionDialog
 from i2cdgui.app import App
+from i2cdgui.find_actions_dialog import FindActionDialog
 from i2cdgui.projects_gui import (
     DeleteProjectDialog,
     NewProjectDialog,
