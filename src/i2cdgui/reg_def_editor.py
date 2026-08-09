@@ -80,6 +80,9 @@ class RegisterPrototype:
 
     __address_str: str = ""
 
+    def __post_init__(self):
+        self.__address_str = "" if self.address is None else f"0x{self.address:04X}"
+
     def set_name(self, name: str):
         self.name = name
 
@@ -113,9 +116,19 @@ class RegisterPrototype:
                 model=self.model,
             )
 
+    @staticmethod
+    def from_register(register: Register) -> "RegisterPrototype":
+        return RegisterPrototype(
+            name="" if register.name is None else register.name,
+            address=register.address,
+            width=register.width,
+            model=[fd.copy() for fd in register._model],
+            gui_model=[],
+        )
+
 
 class AddressInput(LineEdit):
-    valid_address_re = re.compile("^(0x)?[0-9a-fA-F]+$]]")
+    valid_address_re = re.compile("^(0x)?[0-9a-fA-F]+$")
 
     def __init__(self, register: RegisterPrototype):
         super().__init__(
@@ -144,19 +157,20 @@ class AddressInput(LineEdit):
 
 
 class DefRegEditor(Dialog):
-    def __init__(self, app: App, *, width: int, windowTitle: str | None = None):
+    def __init__(
+        self,
+        app: App,
+        *,
+        is_new_register: bool,
+        register_proto: RegisterPrototype,
+        windowTitle: str | None = None,
+    ):
         super().__init__(app.main_window, windowTitle=windowTitle, modal=True)
         self.app = app
-        self.cb_togle_enabled = True
-        self.register_proto = RegisterPrototype(
-            name="",
-            address=None,
-            width=width,
-            model=[
-                FieldDef(name="", offset=0, signed="U", width=0, fractional=0, rw=True)
-            ],
-            gui_model=[],
-        )
+        self.is_new_register = is_new_register
+        self.cb_toggle_enabled = True
+        self.register_proto = register_proto
+        self.original_register_name = self.register_proto.name
         name = "" if self.register_proto.name is None else self.register_proto.name
         self.register_proto.width = 8 * (self.register_proto.width // 8) + (
             8 if (self.register_proto.width % 8) > 0 else 0
@@ -242,10 +256,20 @@ class DefRegEditor(Dialog):
 
     def save_register(self):
         try:
-            register = self.register_proto.to_register()
-            self.app.project.reg_list.add(register)
+            new_register = self.register_proto.to_register()
+            if self.is_new_register:
+                self.app.project.reg_list.add(new_register)
+            else:
+                # we are editing register
+                original_register = self.app.project.reg_list.get_register_by_name(
+                    self.original_register_name
+                )
+                self.app.project.reg_list.update_register_def(
+                    original_register, new_register
+                )
+
             self.app.request_reglist_reload()
-            self.app.request_reglist_select_register(register)
+            self.app.request_reglist_select_register(new_register)
             self.close()
         except Exception as ex:
             self.app.show_error(f"{ex}")
@@ -333,7 +357,7 @@ class DefRegEditor(Dialog):
 
                 def mk_cb_toggled(cbb: CheckBox):
                     def cb_toggled(on: bool):
-                        if not self.cb_togle_enabled:
+                        if not self.cb_toggle_enabled:
                             return
 
                         field_idx: int = cbb.property("field_idx")
@@ -363,14 +387,14 @@ class DefRegEditor(Dialog):
                             range(field_def.offset, field_def.end_offset() + 1)
                         )
                         try:
-                            self.cb_togle_enabled = False
+                            self.cb_toggle_enabled = False
                             for cb in self.register_proto.gui_model[
                                 field_idx
                             ].checkboxes:
                                 idx: int = cb.property("offset")
                                 cb.setChecked(idx in ids_checked)
                         finally:
-                            self.cb_togle_enabled = True
+                            self.cb_toggle_enabled = True
 
                         # now update other fields disabling checkboxes
                         for j, other_field_def in enumerate(self.register_proto.model):
@@ -437,7 +461,25 @@ class NewRegDefDialog(Dialog):
         def open_edit_dialog():
             self.close()
             DefRegEditor(
-                app, width=self.bit_width.value, windowTitle="Create new register"
+                app,
+                windowTitle="Create new register",
+                is_new_register=True,
+                register_proto=RegisterPrototype(
+                    name="",
+                    address=None,
+                    width=self.bit_width.value,
+                    model=[
+                        FieldDef(
+                            name="",
+                            offset=0,
+                            signed="U",
+                            width=0,
+                            fractional=0,
+                            rw=True,
+                        )
+                    ],
+                    gui_model=[],
+                ),
             ).exec()
 
         self.setLayout(

@@ -56,23 +56,20 @@ class Project:
 
     def add_result(self, row: list[str]):
         self.results.append(row)
-        self.results.sort(key=lambda x: int(x[0], 16))
-        # self.save_results()
+        self.results.sort(key=lambda x: int(x[3], 16))
 
     def remove_result(self, index: int):
         self.results.pop(index)
-        # self.save_results()
 
     def replace_result(self, index: int, row: list[str]):
         self.results[index] = row
-        # self.save_results()
 
     def get_results_at_index(self, index: int) -> list[str]:
         return self.results[index]
 
     def get_results_index_of_by_addr(self, address: str) -> int:
         try:
-            return [row[0] for row in self.results].index(address)
+            return [row[3] for row in self.results].index(address)
         except ValueError:
             return -1
 

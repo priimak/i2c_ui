@@ -18,7 +18,13 @@ from i2cdgui.gui_tools import (
     TableModelWithThreeColumns,
     apply_filter_to_text,
 )
-from i2cdgui.reg_def_editor import NewRegDefDialog
+from i2cdgui.reg_def_editor import DefRegEditor, NewRegDefDialog, RegisterPrototype
+
+
+@dataclass
+class RowAndRegisterName:
+    row: int
+    name: str
 
 
 @dataclass
@@ -161,17 +167,21 @@ class RegInfoText(QTextEdit):
             fields_rows += (
                 f"<tr><td>&nbsp;</td><td><b><em>{field_def.name}&nbsp;&nbsp;</em></b></td>"
                 f"<td>[{field_def.end_offset()}:{field_def.offset}]&nbsp;&nbsp;</td>"
-                f"<td>{field_def.signed}{field_def.width}.{field_def.fractional}</td></tr>"
+                f"<td>{field_def.signed}{field_def.width}.{field_def.fractional}</td>"
             )
+            if field_def.rw:
+                fields_rows += "<td>&nbsp;&nbsp;r/w</td></tr>"
+            else:
+                fields_rows += "<td>&nbsp;&nbsp;r/o</td></tr>"
 
         self.setText(
             f"""
             <table>
             <tbody>
-            <tr><td>Register:</td><td colspan=3><b><em>{register.name}</em></b></td></tr>
-            <tr><td>Address:</td><td colspan=3><b><em>0x{register.address:04X}</em></b></td></tr>
-            <tr><td>Width (bits):&nbsp;&nbsp;</td><td colspan=3><b><em>{register.width}</em></b></td></tr>
-            <tr><td colspan=4>Fields:</td></tr>
+            <tr><td>Register:</td><td colspan=4><b><em>{register.name}</em></b></td></tr>
+            <tr><td>Address:</td><td colspan=4><b><em>0x{register.address:04X}</em></b></td></tr>
+            <tr><td>Width (bits):&nbsp;&nbsp;</td><td colspan=4><b><em>{register.width}</em></b></td></tr>
+            <tr><td colspan=5>Fields:</td></tr>
             {fields_rows}
             </tbody>
             </table>
@@ -203,11 +213,11 @@ class RegListPanel(VBoxPanel):
         self.context_menu = Menu(
             parent=self,
             actions=[
-                ("Define new register", self.define_new_register),
-                ("Edit register", lambda: None),
-                ("Delete register", self.delete_selected_register),
+                ("Read register", self.read_selected_register),
                 Menu.Separator,
-                ("Read register", lambda: None),
+                ("Edit register", self.edit_selected_register),
+                ("Define new register", lambda: NewRegDefDialog(self.app).exec()),
+                ("Delete register", self.delete_selected_register),
             ],
         )
         self.reglist_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -219,7 +229,7 @@ class RegListPanel(VBoxPanel):
 
         self.search_field = InTableSearchField(
             table_view=self.reglist_table,
-            on_key_enter=lambda index: None,
+            on_key_enter=lambda _: self.read_selected_register(),
             close_action=lambda: None,
         )
 
@@ -250,34 +260,32 @@ class RegListPanel(VBoxPanel):
 
         self.reglist_table.selectionModel().selectionChanged.connect(selection_changed)
 
+        self.splitter = Splitter(
+            Qt.Orientation.Horizontal,
+            childrenCollapsible=False,
+            handleWidth=8,
+            widgets=[self.reglist_table, self.register_text],
+            margins=0,
+        )
         self.withWidgets(
             HBoxPanel(
                 widgets=[
                     PushButton(
-                        "Define new register", on_clicked=self.define_new_register
+                        "Define new register",
+                        on_clicked=lambda: NewRegDefDialog(self.app).exec(),
                     ),
-                    PushButton("Edit register"),
+                    PushButton("Edit register", on_clicked=self.edit_selected_register),
                     PushButton(
                         "Delete register", on_clicked=self.delete_selected_register
                     ),
                     QLabel("        "),
-                    PushButton("Read register"),
+                    PushButton("Read register", on_clicked=self.read_selected_register),
                     W(stretch=1),
                 ],
                 margins=0,
             ),
             self.search_field,
-            W(
-                Splitter(
-                    Qt.Orientation.Horizontal,
-                    childrenCollapsible=False,
-                    handleWidth=8,
-                    widgets=[self.reglist_table, self.register_text],
-                    # stretchFactors=[(1, 2)],
-                    margins=0,
-                ),
-                stretch=2,
-            ),
+            W(self.splitter, stretch=2),
         )
 
     def request_reglist_reload(self):
@@ -287,31 +295,66 @@ class RegListPanel(VBoxPanel):
         self.reglist_table.table_model.endResetModel()
 
     def pass_key_press_event(self) -> Callable[[QKeyEvent], None]:
-        return self.search_field.keyPressEvent
+        def key_pressed(event: QKeyEvent) -> None:
+            if event.key() in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
+                self.read_selected_register()
+            else:
+                self.search_field.keyPressEvent(event)
+
+        return key_pressed
 
     def on_actions_table_double_clicked(self, index: QModelIndex):
-        pass
+        self.read_selected_register()
 
     def define_new_register(self):
         NewRegDefDialog(self.app).exec()
 
-    def delete_selected_register(self):
+    def get_selected_register_name(self) -> RowAndRegisterName | None:
         selected_indexes = self.reglist_table.selectedIndexes()
         if selected_indexes is not None and len(selected_indexes) > 0:
             selected_row = selected_indexes[0].row()
-            register_name = self.reglist_table.table_model.registers_to_display[
-                selected_row
-            ].pure_name
+            return RowAndRegisterName(
+                row=selected_row,
+                name=self.reglist_table.table_model.registers_to_display[
+                    selected_row
+                ].pure_name,
+            )
+        else:
+            return None
+
+    def edit_selected_register(self):
+        row_and_name = self.get_selected_register_name()
+        if row_and_name is not None:
+            register = self.app.project.reg_list.get_register_by_name(row_and_name.name)
+            DefRegEditor(
+                app=self.app,
+                windowTitle="Edit Register",
+                is_new_register=False,
+                register_proto=RegisterPrototype.from_register(
+                    self.app.project.reg_list.get_register_by_name(register.name)
+                ),
+            ).exec()
+
+    def delete_selected_register(self):
+        register = self.get_selected_register_name()
+        if register is not None:
             ret = QMessageBox.question(
                 self.app.main_window,
                 "Delete register?",
-                f"Please confirm that you want to delete register [{register_name}]?",
+                f"Please confirm that you want to delete register [{register.name}]?",
                 QMessageBox.StandardButton.Yes,
                 QMessageBox.StandardButton.No,
             )
             if ret == QMessageBox.StandardButton.Yes:
-                self.app.project.reg_list.delete_register_by_name(register_name)
+                self.app.project.reg_list.delete_register_by_name(register.name)
                 self.app.request_results_reload()
                 self.app.request_reglist_reload()
                 self.search_field.textChanged.emit(self.search_field.text())
-                self.reglist_table.selectRow(selected_row)
+                self.reglist_table.selectRow(register.row)
+
+    def read_selected_register(self):
+        register = self.get_selected_register_name()
+        if register is not None:
+            r = self.app.project.reg_list.get_register_by_name(register.name)
+            self.app.change_read_register_address(f"0x{r.address:04X}")
+            self.app.read_register()

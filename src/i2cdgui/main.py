@@ -75,19 +75,20 @@ class I2CDriverWindow(MainWindow):
         )
 
         cpanel = CommandsPanel(app)
-        cpanel.setBackgroundColor("orange")
+        cpanel.setBackgroundColor("lightgreen")
 
-        in_right_panel = QTabWidget()
-        in_right_panel.setDocumentMode(True)
-        in_right_panel.addTab(
-            VBoxPanel(background_color="lightpink"), "Variables and Commands"
+        right_bottom_panel = QTabWidget()
+        right_bottom_panel.setDocumentMode(True)
+        right_bottom_panel.addTab(
+            VBoxPanel(background_color="lightyellow"), "Variables and Commands"
         )
-        in_right_panel.addTab(RegListPanel(app), "RegList")
+        self.reg_list_panel = RegListPanel(app)
+        right_bottom_panel.addTab(self.reg_list_panel, "RegList")
 
         right_panel = VBoxPanel(
             widgets=[
                 VBoxPanel([cpanel], background_color="black", margins=1),
-                W(in_right_panel, stretch=2),
+                W(right_bottom_panel, stretch=2),
             ],
             margins=0,
         )
@@ -99,15 +100,9 @@ class I2CDriverWindow(MainWindow):
         )
         self.setCentralWidget(
             VBoxPanel(
-                widgets=[
-                    W(
-                        self.hsplitter,
-                        stretch=2,
-                    ),
-                    self.info_panel,
-                ],
+                widgets=[W(self.hsplitter, stretch=2), self.info_panel],
                 spacing=0,
-                margins=(0, 0, 0, 0),
+                margins=0,
             )
         )
 
@@ -135,19 +130,33 @@ class I2CDriverWindow(MainWindow):
         self.app.persistence.state.save_geometry(self.objectName(), self.saveGeometry())
 
         state: QByteArray = self.hsplitter.saveState()
-        spl_state = (
+        self.app.persistence.state.set_value(
+            "main_splitter_state",
             state.toBase64(QByteArray.Base64Option.Base64Encoding)
             .data()
-            .decode("utf-8")
+            .decode("utf-8"),
         )
-        self.app.persistence.state.set_value("splitter_state", spl_state)
+
+        state: QByteArray = self.reg_list_panel.splitter.saveState()
+        self.app.persistence.state.set_value(
+            "reg_list_splitter_state",
+            state.toBase64(QByteArray.Base64Option.Base64Encoding)
+            .data()
+            .decode("utf-8"),
+        )
+
         self.app.project.save()
         event.accept()
 
     def restore(self):
-        spl_state = self.app.persistence.state.get_value("splitter_state")
+        spl_state = self.app.persistence.state.get_value("main_splitter_state")
         if spl_state is not None:
             self.hsplitter.restoreState(
+                QByteArray.fromBase64(spl_state.encode("utf-8"))
+            )
+        spl_state = self.app.persistence.state.get_value("reg_list_splitter_state")
+        if spl_state is not None:
+            self.reg_list_panel.splitter.restoreState(
                 QByteArray.fromBase64(spl_state.encode("utf-8"))
             )
 

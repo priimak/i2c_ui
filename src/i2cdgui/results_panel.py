@@ -128,7 +128,7 @@ class ResultsTable(QTableView):
         for index in self.selectedIndexes():
             row = self.model.project.get_results_at_index(index.row())
             self.app.re_read_register_at_addr(
-                reg_addr=int(row[0], 16), num_bytes=int(len(row[2]) / 8)
+                reg_addr=int(row[3], 16), num_bytes=int(len(row[2]) / 8)
             )
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
@@ -159,7 +159,7 @@ class ResultsTable(QTableView):
     def re_read_register(self, index: QModelIndex):
         row = self.model.project.get_results_at_index(index.row())
         self.app.re_read_register_at_addr(
-            reg_addr=int(row[0], 16), num_bytes=int(len(row[2]) / 8)
+            reg_addr=int(row[3], 16), num_bytes=int(len(row[2]) / 8)
         )
 
     def re_read_all_registers(self):
@@ -170,7 +170,7 @@ class ResultsTable(QTableView):
             self.app.op_thread.commands.put(
                 ReadRegister(
                     device_address=self.app.device_address,
-                    register_address=int(row[0], 16),
+                    register_address=int(row[3], 16),
                     num_bytes=int(len(row[2]) / 8),
                     highlight=highlight_individual,
                 )
@@ -202,14 +202,44 @@ class ResultsTable(QTableView):
         self.model.beginResetModel()
         if row == -1:
             # insert new row
+            register = self.app.project.reg_list.get_register_by_address(
+                int(data.register_address, 16)
+            )
             self.model.project.add_result(
-                [data.register_address, data.hexval, data.binval]
+                [
+                    data.register_address
+                    if register is None
+                    else f"{register.name} @ {data.register_address}",
+                    data.hexval,
+                    data.binval,
+                    data.register_address,
+                ]
             )
             row = self.model.indexOfByAddr(data.register_address)
         else:
-            self.model.project.replace_result(
-                row, [data.register_address, data.hexval, data.binval]
+            register = self.app.project.reg_list.get_register_by_address(
+                int(data.register_address, 16)
             )
+            if register is None:
+                self.model.project.replace_result(
+                    row,
+                    [
+                        data.register_address,
+                        data.hexval,
+                        data.binval,
+                        data.register_address,
+                    ],
+                )
+            else:
+                self.model.project.replace_result(
+                    row,
+                    [
+                        f"{register.name} @ {data.register_address}",
+                        data.hexval,
+                        data.binval,
+                        data.register_address,
+                    ],
+                )
 
         if data.highlight:
             self.model.highlighted_rows.add(row)
