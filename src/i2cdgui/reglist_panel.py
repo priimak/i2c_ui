@@ -5,8 +5,8 @@ from typing import Any
 from PySide6 import QtGui
 from PySide6.QtCore import QItemSelection, QModelIndex, QPersistentModelIndex, Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QLabel, QMenu, QMessageBox, QTextEdit
-from pytide6 import HBoxPanel, PushButton, Splitter, VBoxPanel, W
+from PySide6.QtWidgets import QLabel, QMessageBox, QTextEdit
+from pytide6 import HBoxPanel, Menu, PushButton, Splitter, VBoxPanel, W
 from rgscore import Register, RegList
 
 from i2cdgui.app import App
@@ -200,12 +200,16 @@ class RegListPanel(VBoxPanel):
         )
         app.request_reglist_reload = self.request_reglist_reload
 
-        self.context_menu = QMenu(self)
-        self.context_menu.addAction("Define new register", self.define_new_register)
-        self.context_menu.addAction("Edit register")
-        self.context_menu.addAction("Delete register", self.delete_selected_register)
-        self.context_menu.addSeparator()
-        self.context_menu.addAction("Read register")
+        self.context_menu = Menu(
+            parent=self,
+            actions=[
+                ("Define new register", self.define_new_register),
+                ("Edit register", lambda: None),
+                ("Delete register", self.delete_selected_register),
+                Menu.Separator,
+                ("Read register", lambda: None),
+            ],
+        )
         self.reglist_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.reglist_table.customContextMenuRequested.connect(
             lambda pos: self.context_menu.popup(

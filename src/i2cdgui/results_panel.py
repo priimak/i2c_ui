@@ -3,8 +3,8 @@ from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex
 from PySide6.QtGui import QColor, QKeyEvent, QMouseEvent, Qt
-from PySide6.QtWidgets import QAbstractItemView, QMenu, QTableView, QWidget
-from pytide6 import ComboBox, HBoxPanel, Label, PushButton, VBoxPanel, W
+from PySide6.QtWidgets import QAbstractItemView, QTableView, QWidget
+from pytide6 import ComboBox, HBoxPanel, Label, Menu, PushButton, VBoxPanel, W
 
 from i2cdgui.app import App
 from i2cdgui.i2c_op_thread import HighlightOff, ReadRegister, RequestReadAllRegisters
@@ -102,13 +102,13 @@ class ResultsTable(QTableView):
         self.setModel(self.model)
         self.doubleClicked.connect(self.re_read_register)
 
-        self.context_menu = QMenu(self)
-        self.context_menu.addAction("Define register")
-        self.context_menu.addAction(
-            "Re-read from device", self.re_read_selected_register
-        )
-        self.context_menu.addAction(
-            "Remove from results panel", self.remove_select_reg_result
+        self.context_menu = Menu(
+            parent=self,
+            actions=[
+                ("Define register", lambda: None),
+                ("Re-read from device", self.re_read_selected_register),
+                ("Remove from results panel", self.remove_select_reg_result),
+            ],
         )
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

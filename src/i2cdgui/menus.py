@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QMenu, QMenuBar, QMessageBox, QWidget
+from pytide6 import Menu
 
 from i2cdgui import __version__
 from i2cdgui.app import App
@@ -44,29 +45,31 @@ class FileMenu(QMenu):
         self.addAction("&Quit", lambda: app.exit_application[0]())
 
 
-class HelpMenu(QMenu):
-    def __init__(self, parent: QWidget, app: App):
-        super().__init__("&Help", parent)
-
-        self.addAction(
-            "Find Action... Ctrl+Shift+A", lambda: FindActionDialog(app).exec()
-        )
-        self.addAction(
-            "&About",
-            lambda: QMessageBox.about(
-                parent,
-                "About",
-                f"<html><H2>I2C GUI</H2><H4>Version: {__version__}</H4>"
-                '<p style="font-size:14px;">"While there is life there is hope. I beg to assert...that '
-                "as long as a man's heart beats, as long as a man's flesh quivers, I do not allow that a being "
-                'gifted with thought and will can allow himself to despair."</br>'
-                "&nbsp;&nbsp;&nbsp;&nbsp;- <em>Jules Verne, Journey to the Center of the Earth</em></html>",
-            ),
-        )
-
-
 class MainMenuBar(QMenuBar):
     def __init__(self, app: App, dialogs_parent: QWidget) -> None:
         super().__init__(dialogs_parent)
         self.addMenu(FileMenu(self, app))
-        self.addMenu(HelpMenu(self, app))
+        self.addMenu(
+            Menu(
+                "&Help",
+                parent=self,
+                actions=[
+                    (
+                        "Find Action... Ctrl+Shift+A",
+                        lambda: FindActionDialog(app).exec(),
+                    ),
+                    (
+                        "&About",
+                        lambda: QMessageBox.about(
+                            self,
+                            "About",
+                            f"<html><H2>I2C GUI</H2><H4>Version: {__version__}</H4>"
+                            '<p style="font-size:14px;">"While there is life there is hope. I beg to assert...that '
+                            "as long as a man's heart beats, as long as a man's flesh quivers, I do not allow that a being "
+                            'gifted with thought and will can allow himself to despair."</br>'
+                            "&nbsp;&nbsp;&nbsp;&nbsp;- <em>Jules Verne, Journey to the Center of the Earth</em></html>",
+                        ),
+                    ),
+                ],
+            )
+        )
