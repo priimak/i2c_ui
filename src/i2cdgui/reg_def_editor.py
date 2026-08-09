@@ -244,6 +244,8 @@ class DefRegEditor(Dialog):
         try:
             register = self.register_proto.to_register()
             self.app.project.reg_list.add(register)
+            self.app.request_reglist_reload()
+            self.app.request_reglist_select_register(register)
             self.close()
         except Exception as ex:
             self.app.show_error(f"{ex}")

@@ -4,6 +4,7 @@ from i2c_api import I2CMaster
 from i2capi_i2cdriver import I2CMasterI2CDriver
 from i2cdriver import I2CDriver
 from PySide6.QtWidgets import QApplication, QMainWindow
+from rgscore import Register
 from sprats.config import AppPersistence
 
 from i2cdgui.dummy_i2cmaster import DummyI2CMaster
@@ -38,6 +39,10 @@ class App:
             None
         )
         self.request_results_reload: Callable[[], None] = lambda: None
+        self.request_reglist_reload: Callable[[], None] = lambda: None
+        self.request_reglist_select_register: Callable[[Register], None] = lambda _: (
+            None
+        )
 
         self.op_thread = I2COpThread()
         self.op_thread.start()
@@ -154,6 +159,7 @@ class App:
         self.project.save()  # save all data associated with the currently open project
         self.project = self.projects.open_project(name)
         self.request_results_reload()
+        self.request_reglist_reload()
         self.update_project_selector_current_project(self.project.name)
         self.persistence.config.set_value("last_open_project", name)
 

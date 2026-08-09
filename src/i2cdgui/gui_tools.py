@@ -59,7 +59,7 @@ class TableModelWithFilterAction(QAbstractTableModel):
 class ListTableView[T: TableModelWithFilterAction](QTableView):
     def __init__(
         self,
-        table_mode: T,
+        table_model: T,
         pass_key_press_event: Callable[[], Callable[[QKeyEvent], None]],
         on_double_clicked: Callable[[QModelIndex], None] | None,
         hide_horizontal_header: bool = False,
@@ -72,7 +72,7 @@ class ListTableView[T: TableModelWithFilterAction](QTableView):
         if hide_horizontal_header:
             self.horizontalHeader().hide()
         self.select_chars = []
-        self.table_model = table_mode
+        self.table_model = table_model
         self.setModel(self.table_model)
         self.setItemDelegate(Txt2HTMLDelegate())
 
@@ -154,6 +154,11 @@ class TableModelWithOneColumn:
 class TableModelWithTwoColumns:
     def columnCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return 2
+
+
+class TableModelWithThreeColumns:
+    def columnCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
+        return 3
 
 
 class TableModelWithoutHeader:

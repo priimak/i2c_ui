@@ -109,10 +109,10 @@ class FindActionDialog(Dialog):
         )
         self.app = app
         self.actions_table = ListTableView(
-            table_mode=ActionsModel(),
+            table_model=ActionsModel(),
             pass_key_press_event=self.pass_key_press_event,
             on_double_clicked=self.on_actions_table_double_clicked,
-            hide_horizontal_header=True
+            hide_horizontal_header=True,
         )
         self.search_field = InTableSearchField(
             table_view=self.actions_table,

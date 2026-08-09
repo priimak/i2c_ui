@@ -8,10 +8,17 @@ from PySide6.QtGui import QCloseEvent, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QMessageBox,
-    QSplitter,
     QTabWidget,
 )
-from pytide6 import ComboBox, HBoxPanel, MainWindow, VBoxPanel, W, set_geometry
+from pytide6 import (
+    ComboBox,
+    HBoxPanel,
+    MainWindow,
+    Splitter,
+    VBoxPanel,
+    W,
+    set_geometry,
+)
 from sprats.config import AppPersistence
 
 from i2cdgui.app import App
@@ -62,15 +69,10 @@ class I2CDriverWindow(MainWindow):
         self.app = app
         self.info_panel = InfoPanel(app)
 
-        self.hsplitter = QSplitter(Qt.Orientation.Horizontal)
-        self.hsplitter.setChildrenCollapsible(False)
-        self.hsplitter.setHandleWidth(8)
-
         self.res_table = ResultsPanel(self.app)
         left_panel = VBoxPanel(
             widgets=[self.res_table], background_color="gray", margins=1
         )
-        self.hsplitter.addWidget(left_panel)
 
         cpanel = CommandsPanel(app)
         cpanel.setBackgroundColor("orange")
@@ -89,11 +91,19 @@ class I2CDriverWindow(MainWindow):
             ],
             margins=0,
         )
-        self.hsplitter.addWidget(right_panel)
+        self.hsplitter = Splitter(
+            Qt.Orientation.Horizontal,
+            childrenCollapsible=False,
+            handleWidth=8,
+            widgets=[left_panel, right_panel],
+        )
         self.setCentralWidget(
             VBoxPanel(
                 widgets=[
-                    W(HBoxPanel(widgets=[self.hsplitter]), stretch=2),
+                    W(
+                        self.hsplitter,
+                        stretch=2,
+                    ),
                     self.info_panel,
                 ],
                 spacing=0,
