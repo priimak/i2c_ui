@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Self
 
@@ -7,6 +8,34 @@ from rgscore import RegList
 
 PROJECT_RE = re.compile("^[a-zA-Z0-9_]+$")
 PROJECT_VALID_CHAR_RE = re.compile("[a-zA-Z0-9_]")
+
+
+@dataclass
+class RawResult:
+    name_and_address: str
+    value_hex: str
+    value_bin: str
+    address: int
+
+    def get_value_at_column(self, column: int) -> str:
+        match column:
+            case 0:
+                return self.name_and_address
+            case 1:
+                return self.value_hex
+            case 2:
+                return self.value_bin
+            case _:
+                return ""
+
+    @staticmethod
+    def from_dict_def(data: dict) -> "RawResult":
+        return RawResult(
+            name_and_address=data["name_and_address"],
+            value_hex=data["value_hex"],
+            value_bin=data["value_bin"],
+            address=data["address"],
+        )
 
 
 class Project:
@@ -24,7 +53,13 @@ class Project:
         if not self.reg_list_path.exists():
             self.save_reglist()
 
-        self.results: list[list[str]] = []
+        self.results: list[RawResult] = []
+
+    def get_raw_result_for_address(self, register_address: int) -> RawResult | None:
+        for row in self.results:
+            if row.address == register_address:
+                return row
+        return None
 
     def copy_to(self, target_project: "Project"):
         target_project.version_json_path.write_bytes(
@@ -38,7 +73,10 @@ class Project:
         if version != 1:
             raise RuntimeError(f"Unable to load project version {version}")
         self.reg_list = RegList.from_json_def(self.reg_list_path.read_text())
-        self.results = json.loads(self.results_path.read_text())
+
+        self.results = [
+            RawResult(**row) for row in json.loads(self.results_path.read_text())
+        ]
         return self
 
     def save(self) -> Self:
@@ -49,27 +87,37 @@ class Project:
         return self
 
     def save_results(self):
-        self.results_path.write_text(json.dumps(self.results))
+        self.results_path.write_text(json.dumps([asdict(row) for row in self.results]))
 
     def save_reglist(self):
         self.reg_list_path.write_text(self.reg_list.to_json_def())
 
-    def add_result(self, row: list[str]):
+    def add_result(self, row: RawResult):
         self.results.append(row)
-        self.results.sort(key=lambda x: int(x[3], 16))
+        self.results.sort(key=lambda x: x.address)
 
-    def remove_result(self, index: int):
-        self.results.pop(index)
-
-    def replace_result(self, index: int, row: list[str]):
-        self.results[index] = row
-
-    def get_results_at_index(self, index: int) -> list[str]:
-        return self.results[index]
-
-    def get_results_index_of_by_addr(self, address: str) -> int:
+    def remove_result(self, index: int) -> RawResult | None:
         try:
-            return [row[3] for row in self.results].index(address)
+            return self.results.pop(index)
+        except IndexError:
+            return None
+
+    def replace_result(self, index: int, row: RawResult):
+        try:
+            self.results[index] = row
+        except IndexError:
+            pass
+
+    def get_results_at_row(self, index: int) -> RawResult | None:
+        try:
+            return self.results[index]
+        except IndexError:
+            return None
+
+    def get_results_index_of_by_addr(self, address: int | str) -> int:
+        try:
+            addr = int(address, 16) if isinstance(address, str) else address
+            return [row.address for row in self.results].index(addr)
         except ValueError:
             return -1
 

@@ -44,6 +44,9 @@ class App:
             None
         )
 
+        # called by results panel when register is read and result are (re)displayed
+        self.registers_values_changed: Callable[[int], None] = lambda _: None
+
         self.op_thread = I2COpThread()
         self.op_thread.start()
 
@@ -180,3 +183,13 @@ class App:
             self.projects.delete_project(projects_to_delete)
             project_to_open_instead = self.projects.list_projects()[0]
             self.open_project(project_to_open_instead)
+
+    def update_results_display_data(self):
+        for row in self.project.results:
+            register: Register | None = self.project.reg_list.get_register_by_address(
+                row.address
+            )
+            if register is None:
+                row.name_and_address = f"0x{row.address:02X}"
+            else:
+                row.name_and_address = f"{register.name} @ 0x{register.address:02X}"

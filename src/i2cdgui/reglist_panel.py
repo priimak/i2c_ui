@@ -1,7 +1,9 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any
 
+from bitstring import BitArray
 from PySide6 import QtGui
 from PySide6.QtCore import QItemSelection, QModelIndex, QPersistentModelIndex, Qt
 from PySide6.QtGui import QKeyEvent
@@ -38,7 +40,7 @@ class RegisterDisplayData:
 def mk_registers_to_display(reg_list: RegList) -> list[RegisterDisplayData]:
     return [
         RegisterDisplayData(
-            address=f"0x{register.address:04X}",
+            address=f"0x{register.address:02X}",
             name=register.name,
             fields=", ".join(register.get_field_names()),
             pure_name=register.name,
@@ -151,8 +153,12 @@ class RegisterInfoPanel(VBoxPanel):
 
 
 class RegInfoText(QTextEdit):
-    def __init__(self, /):
-        super().__init__("Reg")
+    def __init__(self, app: App):
+        super().__init__()
+        self.app = app
+        self.setStyleSheet("QTextEdit { font-family: 'Monospace'; }")
+        self.register: Register | None = None
+        self.__lock = Lock()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event.key() == Qt.Key.Key_A and event.modifiers() == (
@@ -160,33 +166,48 @@ class RegInfoText(QTextEdit):
         ):
             super().keyPressEvent(event)
 
-    def show_register(self, register: Register) -> None:
-        fields_rows = ""
-        for field_name in register.get_field_names():
-            field_def = register.get_field_definition(field_name)
-            fields_rows += (
-                f"<tr><td>&nbsp;</td><td><b><em>{field_def.name}&nbsp;&nbsp;</em></b></td>"
-                f"<td>[{field_def.end_offset()}:{field_def.offset}]&nbsp;&nbsp;</td>"
-                f"<td>{field_def.signed}{field_def.width}.{field_def.fractional}</td>"
-            )
-            if field_def.rw:
-                fields_rows += "<td>&nbsp;&nbsp;r/w</td></tr>"
-            else:
-                fields_rows += "<td>&nbsp;&nbsp;r/o</td></tr>"
+    def reload_register(self):
+        if self.register is not None:
+            self.show_register(self.register)
 
-        self.setText(
-            f"""
-            <table>
-            <tbody>
-            <tr><td>Register:</td><td colspan=4><b><em>{register.name}</em></b></td></tr>
-            <tr><td>Address:</td><td colspan=4><b><em>0x{register.address:04X}</em></b></td></tr>
-            <tr><td>Width (bits):&nbsp;&nbsp;</td><td colspan=4><b><em>{register.width}</em></b></td></tr>
-            <tr><td colspan=5>Fields:</td></tr>
-            {fields_rows}
-            </tbody>
-            </table>
-        """.strip()
-        )
+    def show_register(self, register: Register) -> None:
+        with self.__lock:
+            self.register = register
+            fields_rows = ""
+            raw_result = self.app.project.get_raw_result_for_address(register.address)
+            if raw_result is not None:
+                register.data.clear()
+                register.data.append(BitArray(f"0b{raw_result.value_bin}"))
+
+            for field_name in register.get_field_names():
+                field_def = register.get_field_definition(field_name)
+                fields_rows += (
+                    f"<tr><td>&nbsp;</td><td><p style='color: blue;'>{field_def.name}&nbsp;&nbsp;</p></td>"
+                    f"<td>[{field_def.end_offset()}:{field_def.offset}]&nbsp;&nbsp;</td>"
+                    f"<td>{field_def.signed}{field_def.width}.{field_def.fractional}</td>"
+                )
+                if field_def.rw:
+                    fields_rows += "<td>&nbsp;&nbsp;r/w</td>"
+                else:
+                    fields_rows += "<td>&nbsp;&nbsp;r/o</td>"
+                if raw_result is None:
+                    fields_rows += "<td></td></tr>"
+                else:
+                    fields_rows += f"<td>&nbsp;&nbsp;=> {register.get_field_value(field_def.name)}</td></tr>"
+
+            self.setText(
+                f"""
+                <table>
+                <tbody>
+                <tr><td>Register:</td><td colspan=5><p style='color: blue;'>{register.name}</p></td></tr>
+                <tr><td>Address:</td><td colspan=5><p style='color: blue;'>0x{register.address:02X}</p></td></tr>
+                <tr><td>Width (bits):&nbsp;&nbsp;</td><td colspan=5><p style='color: blue;'>{register.width}</p></td></tr>
+                <tr><td colspan=6>Fields:</td></tr>
+                {fields_rows}
+                </tbody>
+                </table>
+            """.strip()
+            )
 
 
 class RegListTableView(ListTableView):
@@ -214,6 +235,7 @@ class RegListPanel(VBoxPanel):
             parent=self,
             actions=[
                 ("Read register", self.read_selected_register),
+                ("Write register", self.write_selected_register),
                 Menu.Separator,
                 ("Edit register", self.edit_selected_register),
                 ("Define new register", lambda: NewRegDefDialog(self.app).exec()),
@@ -246,7 +268,7 @@ class RegListPanel(VBoxPanel):
 
         app.request_reglist_select_register = select_register
 
-        self.register_text = RegInfoText()
+        self.register_text = RegInfoText(app)
 
         def selection_changed(selected_item: QItemSelection, _):
             selected_indexes = selected_item.indexes()
@@ -280,6 +302,9 @@ class RegListPanel(VBoxPanel):
                     ),
                     QLabel("        "),
                     PushButton("Read register", on_clicked=self.read_selected_register),
+                    PushButton(
+                        "Write register", on_clicked=self.write_selected_register
+                    ),
                     W(stretch=1),
                 ],
                 margins=0,
@@ -287,6 +312,15 @@ class RegListPanel(VBoxPanel):
             self.search_field,
             W(self.splitter, stretch=2),
         )
+
+        self.app.registers_values_changed = self.registers_values_changed
+
+    def registers_values_changed(self, address: int):
+        if (
+            self.register_text.register is not None
+            and self.register_text.register.address == address
+        ):
+            self.register_text.reload_register()
 
     def request_reglist_reload(self):
         self.reglist_table.table_model.beginResetModel()
@@ -347,14 +381,18 @@ class RegListPanel(VBoxPanel):
             )
             if ret == QMessageBox.StandardButton.Yes:
                 self.app.project.reg_list.delete_register_by_name(register.name)
-                self.app.request_results_reload()
                 self.app.request_reglist_reload()
                 self.search_field.textChanged.emit(self.search_field.text())
                 self.reglist_table.selectRow(register.row)
+                self.app.update_results_display_data()
+                self.app.request_results_reload()
 
     def read_selected_register(self):
         register = self.get_selected_register_name()
         if register is not None:
             r = self.app.project.reg_list.get_register_by_name(register.name)
-            self.app.change_read_register_address(f"0x{r.address:04X}")
+            self.app.change_read_register_address(f"0x{r.address:02X}")
             self.app.read_register()
+
+    def write_selected_register(self):
+        """TODO: Implement me"""

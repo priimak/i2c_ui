@@ -252,6 +252,7 @@ class SaveAsProjectDialog(Dialog):
 
         def create_new_project():
             try:
+                app.project.save()
                 app.create_copy_of_project(app.project.name, new_project_name[0])
                 self.close()
             except Exception as ex:

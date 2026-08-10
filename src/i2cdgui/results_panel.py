@@ -8,7 +8,7 @@ from pytide6 import ComboBox, HBoxPanel, Label, Menu, PushButton, VBoxPanel, W
 
 from i2cdgui.app import App
 from i2cdgui.i2c_op_thread import HighlightOff, ReadRegister, RequestReadAllRegisters
-from i2cdgui.project import Project
+from i2cdgui.project import Project, RawResult
 from i2cdgui.reg_read_results import ShowRegSignalData
 
 
@@ -57,7 +57,11 @@ class ResultsTableModel(QAbstractTableModel):
     ) -> Any:
         if index.isValid():
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-                return self.project.get_results_at_index(index.row())[index.column()]
+                row = self.project.get_results_at_row(index.row())
+                if row is None:
+                    return ""
+                else:
+                    return row.get_value_at_column(index.column())
             elif role == Qt.ItemDataRole.BackgroundRole:
                 return (
                     self.loading_highlight_color
@@ -68,15 +72,6 @@ class ResultsTableModel(QAbstractTableModel):
                 return None
         else:
             return None
-
-    def setData(
-        self, index: QModelIndex | QPersistentModelIndex, value: Any, role: int = ...
-    ) -> bool:
-        if role == Qt.ItemDataRole.EditRole:
-            self.project.get_results_at_index(index.row())[index.column()] = value
-            return True
-        else:
-            return False
 
     def flags(self, index: QModelIndex | QPersistentModelIndex):
         return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
@@ -126,10 +121,11 @@ class ResultsTable(QTableView):
 
     def re_read_selected_register(self):
         for index in self.selectedIndexes():
-            row = self.model.project.get_results_at_index(index.row())
-            self.app.re_read_register_at_addr(
-                reg_addr=int(row[3], 16), num_bytes=int(len(row[2]) / 8)
-            )
+            row = self.model.project.get_results_at_row(index.row())
+            if row is not None:
+                self.app.re_read_register_at_addr(
+                    reg_addr=row.address, num_bytes=int(len(row.value_bin) / 8)
+                )
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         match event.key():
@@ -149,18 +145,21 @@ class ResultsTable(QTableView):
         idx = self.currentIndex()
         if idx is not None:
             self.model.beginResetModel()
-            self.model.project.remove_result(idx.row())
+            removed_row = self.model.project.remove_result(idx.row())
             self.model.endResetModel()
+            if removed_row is not None:
+                self.app.registers_values_changed(removed_row.address)
 
     def request_results_reload(self):
         self.model.beginResetModel()
         self.model.endResetModel()
 
     def re_read_register(self, index: QModelIndex):
-        row = self.model.project.get_results_at_index(index.row())
-        self.app.re_read_register_at_addr(
-            reg_addr=int(row[3], 16), num_bytes=int(len(row[2]) / 8)
-        )
+        row = self.model.project.get_results_at_row(index.row())
+        if row is not None:
+            self.app.re_read_register_at_addr(
+                reg_addr=row.address, num_bytes=int(len(row.value_bin) / 8)
+            )
 
     def re_read_all_registers(self):
         highlight_individual = self.app.re_read_all_period_millis == -1
@@ -170,8 +169,8 @@ class ResultsTable(QTableView):
             self.app.op_thread.commands.put(
                 ReadRegister(
                     device_address=self.app.device_address,
-                    register_address=int(row[3], 16),
-                    num_bytes=int(len(row[2]) / 8),
+                    register_address=row.address,
+                    num_bytes=int(len(row.value_bin) / 8),
                     highlight=highlight_individual,
                 )
             )
@@ -200,50 +199,49 @@ class ResultsTable(QTableView):
     def show_register_value(self, data: ShowRegSignalData) -> None:
         row = self.model.indexOfByAddr(data.register_address)
         self.model.beginResetModel()
+        register_address = int(data.register_address, 16)
         if row == -1:
             # insert new row
             register = self.app.project.reg_list.get_register_by_address(
-                int(data.register_address, 16)
+                register_address
             )
             self.model.project.add_result(
-                [
-                    data.register_address
-                    if register is None
-                    else f"{register.name} @ {data.register_address}",
-                    data.hexval,
-                    data.binval,
-                    data.register_address,
-                ]
+                RawResult(
+                    name_and_address=(
+                        data.register_address
+                        if register is None
+                        else f"{register.name} @ {data.register_address}"
+                    ),
+                    value_hex=data.hexval,
+                    value_bin=data.binval,
+                    address=register_address,
+                )
             )
             row = self.model.indexOfByAddr(data.register_address)
         else:
             register = self.app.project.reg_list.get_register_by_address(
-                int(data.register_address, 16)
+                register_address
             )
-            if register is None:
-                self.model.project.replace_result(
-                    row,
-                    [
-                        data.register_address,
-                        data.hexval,
-                        data.binval,
-                        data.register_address,
-                    ],
-                )
-            else:
-                self.model.project.replace_result(
-                    row,
-                    [
-                        f"{register.name} @ {data.register_address}",
-                        data.hexval,
-                        data.binval,
-                        data.register_address,
-                    ],
-                )
+            self.model.project.replace_result(
+                row,
+                RawResult(
+                    name_and_address=(
+                        data.register_address
+                        if register is None
+                        else f"{register.name} @ {data.register_address}"
+                    ),
+                    value_hex=data.hexval,
+                    value_bin=data.binval,
+                    address=register_address,
+                ),
+            )
 
         if data.highlight:
             self.model.highlighted_rows.add(row)
         self.model.endResetModel()
+
+        # update register def display if necessary
+        self.app.registers_values_changed(register_address)
 
 
 class ResultsPanel(VBoxPanel):

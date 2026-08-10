@@ -81,7 +81,7 @@ class RegisterPrototype:
     __address_str: str = ""
 
     def __post_init__(self):
-        self.__address_str = "" if self.address is None else f"0x{self.address:04X}"
+        self.__address_str = "" if self.address is None else f"0x{self.address:02X}"
 
     def set_name(self, name: str):
         self.name = name
@@ -132,8 +132,8 @@ class AddressInput(LineEdit):
 
     def __init__(self, register: RegisterPrototype):
         super().__init__(
-            text="" if register.address is None else f"0x{register.address:04X}",
-            with_fixed_width_for_text="0xFFFF",
+            text="" if register.address is None else f"0x{register.address:02X}",
+            with_fixed_width_for_text="0xFF",
             validator=QRegularExpressionValidator("^(0x)?[0-9a-fA-F]{0,4}$"),
             on_text_change=register.set_address,
         )
@@ -143,7 +143,7 @@ class AddressInput(LineEdit):
         entered_address = self.text().strip()
         if re.match("^(0x)?[0-9a-fA-F]{1,4}$", entered_address):
             address = int(self.text(), 16)
-            self.setText(f"0x{address:04X}")
+            self.setText(f"0x{address:02X}")
 
     def focusOutEvent(self, event: QtGui.QFocusEvent) -> None:
         self.reformat_input_text()
@@ -270,6 +270,8 @@ class DefRegEditor(Dialog):
 
             self.app.request_reglist_reload()
             self.app.request_reglist_select_register(new_register)
+            self.app.update_results_display_data()
+            self.app.request_results_reload()
             self.close()
         except Exception as ex:
             self.app.show_error(f"{ex}")
