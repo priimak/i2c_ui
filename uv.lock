@@ -175,8 +175,8 @@ wheels = [
 
 [[package]]
 name = "pytide6"
-version = "0.14.1.post8+git.4d4d4f5d.dirty"
-source = { git = "https://github.com/priimak/PyTide6.git?rev=master#4d4d4f5ddc6e2cc23476c1028d6dc6e738b72d71" }
+version = "0.14.1.post9+git.5f944d09.dirty"
+source = { git = "https://github.com/priimak/PyTide6.git?rev=master#5f944d09eee384afeb3cf106a77137261dce40dc" }
 dependencies = [
     { name = "pyside6" },
     { name = "sprats" },
@@ -230,8 +230,8 @@ wheels = [
 
 [[package]]
 name = "sprats"
-version = "0.3.2.post0+git.d2a106b8.dirty"
-source = { git = "https://github.com/priimak/sprats.git?rev=v0.3.2#d2a106b88feb400bbe89cf003eacc090f5e57b78" }
+version = "0.4.0.post0+git.11abdfc2.dirty"
+source = { git = "https://github.com/priimak/sprats.git?rev=v0.4.0#11abdfc2bb577efffab4ac2c7dd0b372faa095a3" }
 
 [[package]]
 name = "tibs"

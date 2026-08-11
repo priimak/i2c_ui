@@ -52,6 +52,7 @@ class PullUpResistorSelector(ComboBox):
 class CommandsPanel(VBoxPanel):
     def __init__(self, app: App):
         super().__init__(margins=1, background_color="gray")
+        self.app = app
         self.addr_selector = AddrSelector(app)
         self.speed_selector = SpeedSelector(app)
         self.pullup_selector = PullUpResistorSelector(app)
@@ -96,11 +97,7 @@ class CommandsPanel(VBoxPanel):
                         Label(" Addr:"),
                         reg_addres_input[0],
                         Label(" Num Bytes:"),
-                        ComboBox(
-                            items=["1", "2", "3", "4"],
-                            current_selection=f"{app.read_register_num_bytes}",
-                            on_text_change=app.change_read_register_num_bytes,
-                        ),
+                        ComboBox(reactive_variable=app.read_register_num_bytes),
                         W(Label(""), stretch=1),
                     ]
                 ),
@@ -112,10 +109,7 @@ class CommandsPanel(VBoxPanel):
                         Label(" Value:"),
                         LineEdit(),
                         Label(" Num Bytes:"),
-                        ComboBox(
-                            items=["1", "2", "3", "4"],
-                            current_selection=f"{app.write_register_num_bytes}",
-                        ),
+                        ComboBox(reactive_variable=app.write_register_num_bytes),
                         W(Label(""), stretch=1),
                     ]
                 ),

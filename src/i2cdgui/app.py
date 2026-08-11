@@ -5,6 +5,7 @@ from i2capi_i2cdriver import I2CMasterI2CDriver
 from i2cdriver import I2CDriver
 from PySide6.QtWidgets import QApplication, QMainWindow
 from rgscore import Register
+from sprats.collections import Variable
 from sprats.config import AppPersistence
 
 from i2cdgui.dummy_i2cmaster import DummyI2CMaster
@@ -22,10 +23,14 @@ class App:
         self.i2c_master_changed: list[Callable[[I2CMaster], None]] = []
 
         self.device_address: int = -1
-        self.read_register_num_bytes: int = 1
+        self.read_register_num_bytes: Variable[int] = Variable(
+            1, valid_values=[1, 2, 3, 4]
+        )
         self.read_register_address_str = ""
 
-        self.write_register_num_bytes: int = 1
+        self.write_register_num_bytes: Variable[int] = Variable(
+            1, valid_values=[1, 2, 3, 4]
+        )
         self.show_error: Callable[[str], None] = lambda _: None
 
         self.show_read_register_results: Callable[[str, str, str, bool], None] = (
@@ -90,9 +95,6 @@ class App:
     def change_read_register_address(self, address: str):
         self.read_register_address_str = address
 
-    def change_read_register_num_bytes(self, num_bytes: str):
-        self.read_register_num_bytes = int(num_bytes)
-
     def device_address_changed(self, device_address: str):
         if device_address != "":
             self.device_address = int(device_address, 16)
@@ -133,7 +135,7 @@ class App:
                 ReadRegister(
                     self.device_address,
                     reg_addr,
-                    num_bytes=self.read_register_num_bytes,
+                    num_bytes=self.read_register_num_bytes.value,
                     highlight=True,
                 )
             )
