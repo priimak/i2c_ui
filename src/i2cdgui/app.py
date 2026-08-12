@@ -26,11 +26,9 @@ class App:
         self.read_register_num_bytes: Variable[int] = Variable(
             1, valid_values=[1, 2, 3, 4]
         )
-        self.read_register_address_str = ""
+        self.read_register_address_str = Variable[str]("")
 
-        self.write_register_num_bytes: Variable[int] = Variable(
-            1, valid_values=[1, 2, 3, 4]
-        )
+        self.write_register_num_bytes = Variable[int](1, valid_values=[1, 2, 3, 4])
         self.show_error: Callable[[str], None] = lambda _: None
 
         self.show_read_register_results: Callable[[str, str, str, bool], None] = (
@@ -92,9 +90,6 @@ class App:
     def connect_highlight_off(self, highlight_off: Callable[[], None]):
         self.op_thread.request_highlight_off.connect(highlight_off)
 
-    def change_read_register_address(self, address: str):
-        self.read_register_address_str = address
-
     def device_address_changed(self, device_address: str):
         if device_address != "":
             self.device_address = int(device_address, 16)
@@ -124,7 +119,7 @@ class App:
     def read_register(self) -> None:
         def get_reg_addr():
             try:
-                return int(self.read_register_address_str, 16)
+                return int(self.read_register_address_str.value, 16)
             except ValueError:
                 self.show_error("Register address is not a hex number")
                 return None

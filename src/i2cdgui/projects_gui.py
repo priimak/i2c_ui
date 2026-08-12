@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 from pytide6 import Dialog, HBoxPanel, Label, PushButton, RichTextLabel, VBoxLayout, W
 from pytide6.inputs import LineEdit
+from sprats.collections import Variable
 
 from i2cdgui.app import App
 from i2cdgui.gui_tools import Txt2HTMLDelegate
@@ -203,22 +204,19 @@ class NewProjectDialog(Dialog):
     def __init__(self, app: App):
         super().__init__(app.main_window, windowTitle="Create New Project", modal=True)
         self.app = app
-        new_project_name = [""]
+        new_project_name = Variable[str]("")
 
         def create_new_project():
             try:
-                app.create_new_project(new_project_name[0])
+                app.create_new_project(new_project_name.value)
                 self.close()
             except Exception as ex:
                 app.show_error(f"{ex}")
 
-        def on_text_change(text: str):
-            new_project_name[0] = text
-
         layout = VBoxLayout(
             [
                 Label("Create New Project"),
-                LineEdit("", min_width=100, on_text_change=on_text_change),
+                LineEdit("", min_width=100, reactive_variable=new_project_name),
                 HBoxPanel(
                     [
                         W(QLabel(), stretch=10),
@@ -248,33 +246,31 @@ class SaveAsProjectDialog(Dialog):
     def __init__(self, app: App):
         super().__init__(app.main_window, windowTitle="Save As Project", modal=True)
         self.app = app
-        new_project_name = [""]
+        new_project_name = Variable[str]("")
 
         def create_new_project():
             try:
                 app.project.save()
-                app.create_copy_of_project(app.project.name, new_project_name[0])
+                app.create_copy_of_project(app.project.name, new_project_name.value)
                 self.close()
             except Exception as ex:
                 app.show_error(f"{ex}")
 
-        def on_text_change(text: str):
-            new_project_name[0] = text
-
-        layout = VBoxLayout(
-            [
-                Label("Create copy of current project"),
-                LineEdit("", min_width=100, on_text_change=on_text_change),
-                HBoxPanel(
-                    [
-                        W(QLabel(), stretch=10),
-                        PushButton("New Project", on_clicked=create_new_project),
-                        PushButton("Cancel", on_clicked=self.close),
-                    ]
-                ),
-            ]
+        self.setLayout(
+            VBoxLayout(
+                [
+                    Label("Create copy of current project"),
+                    LineEdit("", min_width=100, reactive_variable=new_project_name),
+                    HBoxPanel(
+                        [
+                            W(QLabel(), stretch=10),
+                            PushButton("New Project", on_clicked=create_new_project),
+                            PushButton("Cancel", on_clicked=self.close),
+                        ]
+                    ),
+                ]
+            )
         )
-        self.setLayout(layout)
 
     @override
     def keyPressEvent(self, event: QKeyEvent) -> None:

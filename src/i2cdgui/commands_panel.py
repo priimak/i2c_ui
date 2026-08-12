@@ -83,8 +83,7 @@ class CommandsPanel(VBoxPanel):
 
         reg_addres_input.append(
             LineEdit(
-                text=app.read_register_address_str,
-                on_text_change=app.change_read_register_address,
+                reactive_variable=app.read_register_address_str,
                 on_key_enter=do_read_register,
             )
         )

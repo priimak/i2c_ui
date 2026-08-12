@@ -391,7 +391,8 @@ class RegListPanel(VBoxPanel):
         register = self.get_selected_register_name()
         if register is not None:
             r = self.app.project.reg_list.get_register_by_name(register.name)
-            self.app.change_read_register_address(f"0x{r.address:02X}")
+            self.app.read_register_address_str.set_value(f"0x{r.address:02X}")
+            self.app.read_register_num_bytes.set_value(int(r.width / 8))
             self.app.read_register()
 
     def write_selected_register(self):
