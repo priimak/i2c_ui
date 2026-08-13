@@ -25,6 +25,7 @@ from i2cdgui.app import App
 from i2cdgui.commands_panel import CommandsPanel
 from i2cdgui.find_actions_dialog import FindActionDialog
 from i2cdgui.i2c_op_thread import Quit
+from i2cdgui.log_line_label import LogLineLabel
 from i2cdgui.menus import MainMenuBar
 from i2cdgui.opened_project_label import OpenedProjectLabel
 from i2cdgui.reglist_panel import RegListPanel
@@ -49,8 +50,15 @@ class InfoPanel(HBoxPanel):
         super().__init__(background_color="#f1f1f1")
 
         self.com_port_selector = COMPortSelector(app)
+        self.log_line = LogLineLabel()
+        app.show_last_i2c_log_message = self.log_line.set_i2c_log_message
+
         self.layout().addWidgets(
-            [OpenedProjectLabel(app), W(stretch=1), self.com_port_selector]
+            [
+                OpenedProjectLabel(app),
+                W(self.log_line, stretch=1),
+                self.com_port_selector,
+            ]
         )
 
 
@@ -79,11 +87,11 @@ class I2CDriverWindow(MainWindow):
 
         right_bottom_panel = QTabWidget()
         right_bottom_panel.setDocumentMode(True)
+        self.reg_list_panel = RegListPanel(app)
+        right_bottom_panel.addTab(self.reg_list_panel, "RegList")
         right_bottom_panel.addTab(
             VBoxPanel(background_color="lightyellow"), "Variables and Commands"
         )
-        self.reg_list_panel = RegListPanel(app)
-        right_bottom_panel.addTab(self.reg_list_panel, "RegList")
 
         right_panel = VBoxPanel(
             widgets=[

@@ -1,6 +1,8 @@
 from collections.abc import Callable
 
-from i2c_api import I2CMaster
+from bitstring import BitArray
+from i2c_api import I2CLogger, I2CMaster
+from i2c_api.log import I2CTransactionElement
 from i2capi_i2cdriver import I2CMasterI2CDriver
 from i2cdriver import I2CDriver
 from PySide6.QtWidgets import QApplication, QMainWindow
@@ -9,9 +11,17 @@ from sprats.collections import Variable
 from sprats.config import AppPersistence
 
 from i2cdgui.dummy_i2cmaster import DummyI2CMaster
-from i2cdgui.i2c_op_thread import HighlightOff, I2COpThread, ReadRegister
+from i2cdgui.i2c_op_thread import HighlightOff, I2COpThread, ReadRegister, WriteRegister
 from i2cdgui.project import Projects
 from i2cdgui.reg_read_results import ShowRegSignalData
+
+
+class InAppI2CLogger(I2CLogger):
+    def __init__(self, message_appender: Callable[[list], None]):
+        self.message_appender = message_appender
+
+    def log_message(self, message: list[I2CTransactionElement]):
+        self.message_appender(message)
 
 
 class App:
@@ -20,6 +30,7 @@ class App:
         self.port: str | None = None
         self.persistence = persistence
         self.q_application = q_application
+        self.i2c_logger = InAppI2CLogger(self.append_i2c_log_message)
         self.i2c_master_changed: list[Callable[[I2CMaster], None]] = []
 
         self.device_address: int = -1
@@ -28,7 +39,10 @@ class App:
         )
         self.read_register_address_str = Variable[str]("")
 
+        self.write_register_address_str = Variable[str]("")
+        self.write_register_value_str = Variable[str]("")
         self.write_register_num_bytes = Variable[int](1, valid_values=[1, 2, 3, 4])
+
         self.show_error: Callable[[str], None] = lambda _: None
 
         self.show_read_register_results: Callable[[str, str, str, bool], None] = (
@@ -46,6 +60,7 @@ class App:
         self.request_reglist_select_register: Callable[[Register], None] = lambda _: (
             None
         )
+        self.show_last_i2c_log_message: Callable[[list], None] = lambda _: None
 
         # called by results panel when register is read and result are (re)displayed
         self.registers_values_changed: Callable[[int], None] = lambda _: None
@@ -70,6 +85,9 @@ class App:
 
         self.project = self.projects.open_project(last_open_project_name)
         self._main_window = None
+
+    def append_i2c_log_message(self, log_message: list[I2CTransactionElement]):
+        self.show_last_i2c_log_message(log_message)
 
     def connect_show_error(self, show_error: Callable[[str], None]):
         self.op_thread.show_error.connect(show_error)
@@ -108,7 +126,9 @@ class App:
             if self.port is None:
                 self._i2c_driver = DummyI2CMaster()
             else:
-                self._i2c_driver = I2CMasterI2CDriver(I2CDriver(self.port))
+                self._i2c_driver = I2CMasterI2CDriver(
+                    I2CDriver(self.port), logger=self.i2c_logger
+                )
                 self.op_thread._i2c_driver = self._i2c_driver
                 for c in self.i2c_master_changed:
                     c(self._i2c_driver)
@@ -118,11 +138,15 @@ class App:
 
     def read_register(self) -> None:
         def get_reg_addr():
-            try:
-                return int(self.read_register_address_str.value, 16)
-            except ValueError:
-                self.show_error("Register address is not a hex number")
+            if self.read_register_address_str.value.strip() == "":
+                self.show_error("Register address is empty")
                 return None
+            else:
+                try:
+                    return int(self.read_register_address_str.value, 16)
+                except ValueError:
+                    self.show_error("Register address is not a hex number")
+                    return None
 
         reg_addr = get_reg_addr()
         if reg_addr is not None:
@@ -135,6 +159,56 @@ class App:
                 )
             )
             self.op_thread.commands.put(HighlightOff(delay_millis=300))
+
+    def write_register(self):
+        reg_address_str = self.write_register_address_str.value.strip()
+        register_value_str = self.write_register_value_str.value.strip()
+
+        def get_reg_addr():
+            if reg_address_str == "":
+                self.show_error("Register address is empty")
+                return None
+            else:
+                try:
+                    return int(reg_address_str, 16)
+                except ValueError:
+                    self.show_error("Register address is not a hex number")
+                    return None
+
+        def get_reg_value() -> BitArray | None:
+            if register_value_str == "":
+                self.show_error("Register value is empty")
+                return None
+            else:
+                try:
+                    if register_value_str.startswith(("0b", "0x")):
+                        retval = BitArray(register_value_str)
+
+                        write_num_bits = self.write_register_num_bytes.value * 8
+                        if retval.len < write_num_bits:
+                            return BitArray(write_num_bits - retval.len) + retval
+                        else:
+                            return retval[-write_num_bits:]
+                    else:
+                        raise ValueError()
+                except ValueError:
+                    self.show_error("Register value is not a hex or a binary number")
+                    return None
+
+        target_register_address = get_reg_addr()
+        if target_register_address is None:
+            return
+
+        target_register_value = get_reg_value()
+        if target_register_value is None:
+            return
+
+        self.op_thread.commands.put(
+            WriteRegister(
+                self.device_address, target_register_address, target_register_value
+            )
+        )
+        self.op_thread.commands.put(HighlightOff(delay_millis=300))
 
     def re_read_register_at_addr(
         self, reg_addr: int, num_bytes: int, highlight: bool = True

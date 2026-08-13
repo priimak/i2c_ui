@@ -4,11 +4,14 @@ from typing import Any
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex
 from PySide6.QtGui import QColor, QKeyEvent, QMouseEvent, Qt
 from PySide6.QtWidgets import QAbstractItemView, QTableView, QWidget
-from pytide6 import ComboBox, HBoxPanel, Label, Menu, PushButton, VBoxPanel, W
+from pytide6 import HBoxPanel, Label, Menu, PushButton, VBoxPanel, W
 
 from i2cdgui.app import App
 from i2cdgui.i2c_op_thread import HighlightOff, ReadRegister, RequestReadAllRegisters
 from i2cdgui.project import Project, RawResult
+from i2cdgui.reg_def_editor import (
+    open_create_or_edit_register_from_template,
+)
 from i2cdgui.reg_read_results import ShowRegSignalData
 
 
@@ -100,8 +103,8 @@ class ResultsTable(QTableView):
         self.context_menu = Menu(
             parent=self,
             actions=[
-                ("Define register", lambda: None),
                 ("Re-read from device", self.re_read_selected_register),
+                ("Define register", self.define_new_register),
                 ("Remove from results panel", self.remove_select_reg_result),
             ],
         )
@@ -119,6 +122,17 @@ class ResultsTable(QTableView):
 
         self.app.request_results_reload = self.request_results_reload
 
+    def define_new_register(self):
+        for index in self.selectedIndexes():
+            row = self.model.project.get_results_at_row(index.row())
+            if row is not None:
+                open_create_or_edit_register_from_template(
+                    self.app,
+                    register_address=row.address,
+                    width_bits=len(row.value_bin),
+                )
+                return
+
     def re_read_selected_register(self):
         for index in self.selectedIndexes():
             row = self.model.project.get_results_at_row(index.row())
@@ -126,6 +140,7 @@ class ResultsTable(QTableView):
                 self.app.re_read_register_at_addr(
                     reg_addr=row.address, num_bytes=int(len(row.value_bin) / 8)
                 )
+                return
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         match event.key():
@@ -286,10 +301,10 @@ class ResultsPanel(VBoxPanel):
                     PushButton(
                         "Re-Read All", on_clicked=results_table.re_read_all_registers
                     ),
-                    ComboBox(
-                        items=["once", "every 0.25s", "every 0.5s", "every 1s"],
-                        on_text_change=freq_change,
-                    ),
+                    # ComboBox(
+                    #     items=["once", "every 0.25s", "every 0.5s", "every 1s"],
+                    #     on_text_change=freq_change,
+                    # ),
                     self.re_reading_label,
                     W(QWidget(), stretch=2),
                 ],

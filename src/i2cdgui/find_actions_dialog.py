@@ -49,7 +49,6 @@ ACTIONS = [
     Action("Export project into file", None),
     Action("Import project from file", None),
     Action("Open project", lambda app: OpenProjectDialog(app).exec()),
-    Action("Open regList editor", None),
     Action("Read register", None),
     Action(
         "Save currently open project under a different name",

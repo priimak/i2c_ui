@@ -126,6 +126,30 @@ class RegisterPrototype:
             gui_model=[],
         )
 
+    # @staticmethod
+    # def from_results_data(app: App, register_address: int, num_bits: int):
+    #     return DefRegEditor(
+    #         app,
+    #         windowTitle="Create new register",
+    #         is_new_register=True,
+    #         register_proto=RegisterPrototype(
+    #             name="",
+    #             address=register_address,
+    #             width=num_bits,
+    #             model=[
+    #                 FieldDef(
+    #                     name="",
+    #                     offset=0,
+    #                     signed="U",
+    #                     width=0,
+    #                     fractional=0,
+    #                     rw=True,
+    #                 )
+    #             ],
+    #             gui_model=[],
+    #         ),
+    #     )
+
 
 class AddressInput(LineEdit):
     valid_address_re = re.compile("^(0x)?[0-9a-fA-F]+$")
@@ -509,3 +533,38 @@ class NewRegDefDialog(Dialog):
                 ]
             )
         )
+
+
+def open_create_or_edit_register_from_template(
+    app: App, register_address: int, width_bits: int
+):
+    register = app.project.reg_list.get_register_by_address(register_address)
+    if register is None:
+        return DefRegEditor(
+            app,
+            windowTitle="Create new register",
+            is_new_register=True,
+            register_proto=RegisterPrototype(
+                name="",
+                address=register_address,
+                width=width_bits,
+                model=[
+                    FieldDef(
+                        name="",
+                        offset=0,
+                        signed="U",
+                        width=0,
+                        fractional=0,
+                        rw=True,
+                    )
+                ],
+                gui_model=[],
+            ),
+        ).exec()
+    else:
+        DefRegEditor(
+            app=app,
+            windowTitle="Edit Register",
+            is_new_register=False,
+            register_proto=RegisterPrototype.from_register(register),
+        ).exec()

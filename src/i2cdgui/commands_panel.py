@@ -102,11 +102,11 @@ class CommandsPanel(VBoxPanel):
                 ),
                 HBoxPanel(
                     [
-                        PushButton("Write Register"),
+                        PushButton("Write Register", on_clicked=app.write_register),
                         Label(" Addr:"),
-                        LineEdit(),
+                        LineEdit(reactive_variable=app.write_register_address_str),
                         Label(" Value:"),
-                        LineEdit(),
+                        LineEdit(reactive_variable=app.write_register_value_str),
                         Label(" Num Bytes:"),
                         ComboBox(reactive_variable=app.write_register_num_bytes),
                         W(Label(""), stretch=1),

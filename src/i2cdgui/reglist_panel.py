@@ -202,6 +202,7 @@ class RegInfoText(QTextEdit):
                 <tr><td>Register:</td><td colspan=5><p style='color: blue;'>{register.name}</p></td></tr>
                 <tr><td>Address:</td><td colspan=5><p style='color: blue;'>0x{register.address:02X}</p></td></tr>
                 <tr><td>Width (bits):&nbsp;&nbsp;</td><td colspan=5><p style='color: blue;'>{register.width}</p></td></tr>
+                <tr><td>Raw data:&nbsp;&nbsp;</td><td colspan=5><p style='color: blue;'>{register.data.bin}</p></td></tr>
                 <tr><td colspan=6>Fields:</td></tr>
                 {fields_rows}
                 </tbody>
