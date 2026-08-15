@@ -6,7 +6,7 @@ from functools import reduce
 from PySide6 import QtGui
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QRegularExpressionValidator
-from PySide6.QtWidgets import QFrame, QLayoutItem
+from PySide6.QtWidgets import QLayoutItem
 from pytide6 import (
     CheckBox,
     ComboBox,
@@ -18,6 +18,7 @@ from pytide6 import (
     VBoxPanel,
     W,
 )
+from pytide6.frame import HorizonalLine
 from pytide6.inputs import LineEdit
 from rgscore import FieldDef, Register
 from sprats.collections import Variable
@@ -203,12 +204,6 @@ class DefRegEditor(Dialog):
 
         self.fields_panel = self.build_fields_panel(VBoxPanel(margins=0))
 
-        def mk_line():
-            line = QFrame()
-            line.setFrameShape(QFrame.Shape.HLine)
-            line.setFrameShadow(QFrame.Shadow.Sunken)
-            return line
-
         def add_new_field():
             self.remove_all_fields_gui_elements()
             self.register_proto.model.append(
@@ -237,7 +232,7 @@ class DefRegEditor(Dialog):
                         ],
                         margins=0,
                     ),
-                    mk_line(),
+                    HorizonalLine(),
                     HBoxPanel(
                         [
                             Label("Fields"),
@@ -252,7 +247,7 @@ class DefRegEditor(Dialog):
                     ),
                     self.fields_panel,
                     W(stretch=1),
-                    mk_line(),
+                    HorizonalLine(),
                     HBoxPanel(
                         [
                             W(stretch=1),

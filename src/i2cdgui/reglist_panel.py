@@ -21,6 +21,7 @@ from i2cdgui.gui_tools import (
     apply_filter_to_text,
 )
 from i2cdgui.reg_def_editor import DefRegEditor, NewRegDefDialog, RegisterPrototype
+from i2cdgui.reg_write_dialog import RegisterWriteDialog
 
 
 @dataclass
@@ -397,4 +398,7 @@ class RegListPanel(VBoxPanel):
             self.app.read_register()
 
     def write_selected_register(self):
-        """TODO: Implement me"""
+        register = self.get_selected_register_name()
+        if register is not None:
+            r = self.app.project.reg_list.get_register_by_name(register.name)
+            RegisterWriteDialog(self.app, register=r).exec()
