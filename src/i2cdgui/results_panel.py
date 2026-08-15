@@ -106,6 +106,7 @@ class ResultsTable(QTableView):
                 ("Re-read from device", self.re_read_selected_register),
                 ("Define register", self.define_new_register),
                 ("Remove from results panel", self.remove_select_reg_result),
+                ("Clear results panel", self.remove_all_results),
             ],
         )
 
@@ -155,6 +156,14 @@ class ResultsTable(QTableView):
         row = self.rowAt(event.pos().y())
         if row >= 0:
             self.selectRow(row)
+
+    def remove_all_results(self):
+        self.model.beginResetModel()
+        removed_addresses = [row.address for row in self.model.project.results]
+        self.model.project.results.clear()
+        self.model.endResetModel()
+        for addr in removed_addresses:
+            self.app.registers_values_changed(addr)
 
     def remove_select_reg_result(self):
         idx = self.currentIndex()
