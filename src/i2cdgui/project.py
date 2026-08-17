@@ -16,6 +16,7 @@ class RawResult:
     value_hex: str
     value_bin: str
     address: int
+    address_bus_width_in_bytes: int
 
     def get_value_at_column(self, column: int) -> str:
         match column:
@@ -35,6 +36,7 @@ class RawResult:
             value_hex=data["value_hex"],
             value_bin=data["value_bin"],
             address=data["address"],
+            address_bus_width_in_bytes=data["address_bus_width_in_bytes"],
         )
 
 

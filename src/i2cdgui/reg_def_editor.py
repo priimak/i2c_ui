@@ -75,6 +75,7 @@ class FieldDevGUIElements:
 class RegisterPrototype:
     name: str
     address: int | None
+    address_bus_width_bytes: int
     width: int
     model: list[FieldDef]
     gui_model: list[FieldDevGUIElements]
@@ -90,6 +91,7 @@ class RegisterPrototype:
     def set_address(self, address: str) -> None:
         self.__address_str = address
         self.address = 0 if address in ["", "0x"] else int(address, 16)
+        self.address_bus_width_bytes = App.get_address_width(address.removeprefix("0x"))
 
     def to_register(self) -> Register:
         if self.name is None or self.name.strip() == "":
@@ -112,6 +114,7 @@ class RegisterPrototype:
             return Register(
                 bit_len=self.width,
                 address=self.address,
+                address_bus_width_bytes=self.address_bus_width_bytes,
                 name=self.name,
                 link=None,
                 model=self.model,
@@ -122,34 +125,11 @@ class RegisterPrototype:
         return RegisterPrototype(
             name="" if register.name is None else register.name,
             address=register.address,
+            address_bus_width_bytes=register.address_bus_width_bytes,
             width=register.width,
             model=[fd.copy() for fd in register._model],
             gui_model=[],
         )
-
-    # @staticmethod
-    # def from_results_data(app: App, register_address: int, num_bits: int):
-    #     return DefRegEditor(
-    #         app,
-    #         windowTitle="Create new register",
-    #         is_new_register=True,
-    #         register_proto=RegisterPrototype(
-    #             name="",
-    #             address=register_address,
-    #             width=num_bits,
-    #             model=[
-    #                 FieldDef(
-    #                     name="",
-    #                     offset=0,
-    #                     signed="U",
-    #                     width=0,
-    #                     fractional=0,
-    #                     rw=True,
-    #                 )
-    #             ],
-    #             gui_model=[],
-    #         ),
-    #     )
 
 
 class AddressInput(LineEdit):
@@ -157,18 +137,21 @@ class AddressInput(LineEdit):
 
     def __init__(self, register: RegisterPrototype):
         super().__init__(
-            text="" if register.address is None else f"0x{register.address:02X}",
-            with_fixed_width_for_text="0xFF",
+            text=""
+            if register.address is None
+            else f"0x{register.address:0{register.address_bus_width_bytes * 2}X}",
+            with_fixed_width_for_text="0xFFFF",
             validator=QRegularExpressionValidator("^(0x)?[0-9a-fA-F]{0,4}$"),
             on_text_change=register.set_address,
         )
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def reformat_input_text(self):
-        entered_address = self.text().strip()
-        if re.match("^(0x)?[0-9a-fA-F]{1,4}$", entered_address):
-            address = int(self.text(), 16)
-            self.setText(f"0x{address:02X}")
+        entered_address = self.text().strip().removeprefix("0x")
+        if re.match("^(0x)?[0-9a-fA-F]+$", entered_address):
+            address = int(entered_address, 16)
+            address_width = App.get_address_width(entered_address)
+            self.setText(f"0x{address:0{address_width * 2}X}")
 
     def focusOutEvent(self, event: QtGui.QFocusEvent) -> None:
         self.reformat_input_text()
@@ -488,6 +471,7 @@ class NewRegDefDialog(Dialog):
                 register_proto=RegisterPrototype(
                     name="",
                     address=None,
+                    address_bus_width_bytes=1,
                     width=self.bit_width.value,
                     model=[
                         FieldDef(
@@ -531,7 +515,7 @@ class NewRegDefDialog(Dialog):
 
 
 def open_create_or_edit_register_from_template(
-    app: App, register_address: int, width_bits: int
+    app: App, register_address: int, address_bus_width_bytes: int, width_bits: int
 ):
     register = app.project.reg_list.get_register_by_address(register_address)
     if register is None:
@@ -542,6 +526,7 @@ def open_create_or_edit_register_from_template(
             register_proto=RegisterPrototype(
                 name="",
                 address=register_address,
+                address_bus_width_bytes=address_bus_width_bytes,
                 width=width_bits,
                 model=[
                     FieldDef(

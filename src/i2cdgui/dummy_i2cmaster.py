@@ -1,5 +1,5 @@
 from bitstring import Bits
-from i2c_api import I2CLogger, I2CMaster
+from i2c_api import I2CLogger, I2CMaster, RegisterAddress
 from i2capi_i2cdriver.i2cdriver_api import DummyI2CLogger
 
 
@@ -13,7 +13,7 @@ class DummyI2CMaster(I2CMaster):
     def write_register(
         self,
         address: int,
-        register: int,
+        register: RegisterAddress,
         data: Bits | str | int | list[int],
         num_bytes: int | None = 1,
         read_back: bool = False,
@@ -33,7 +33,11 @@ class DummyI2CMaster(I2CMaster):
         return None
 
     def read_register(
-        self, address: int, register: int, num_bytes: int = 1, use_restart: bool = True
+        self,
+        address: int,
+        register: RegisterAddress,
+        num_bytes: int = 1,
+        use_restart: bool = True,
     ) -> Bits | None:
         return None
 

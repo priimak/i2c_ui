@@ -130,6 +130,7 @@ class ResultsTable(QTableView):
                 open_create_or_edit_register_from_template(
                     self.app,
                     register_address=row.address,
+                    address_bus_width_bytes=row.address_bus_width_in_bytes,
                     width_bits=len(row.value_bin),
                 )
                 return
@@ -139,7 +140,9 @@ class ResultsTable(QTableView):
             row = self.model.project.get_results_at_row(index.row())
             if row is not None:
                 self.app.re_read_register_at_addr(
-                    reg_addr=row.address, num_bytes=int(len(row.value_bin) / 8)
+                    reg_addr=row.address,
+                    address_bus_width_in_bytes=row.address_bus_width_in_bytes,
+                    num_bytes=int(len(row.value_bin) / 8),
                 )
                 return
 
@@ -182,7 +185,9 @@ class ResultsTable(QTableView):
         row = self.model.project.get_results_at_row(index.row())
         if row is not None:
             self.app.re_read_register_at_addr(
-                reg_addr=row.address, num_bytes=int(len(row.value_bin) / 8)
+                reg_addr=row.address,
+                address_bus_width_in_bytes=row.address_bus_width_in_bytes,
+                num_bytes=int(len(row.value_bin) / 8),
             )
 
     def re_read_all_registers(self):
@@ -239,6 +244,7 @@ class ResultsTable(QTableView):
                     value_hex=data.hexval,
                     value_bin=data.binval,
                     address=register_address,
+                    address_bus_width_in_bytes=data.address_bus_width_in_bytes,
                 )
             )
             row = self.model.indexOfByAddr(data.register_address)
@@ -257,6 +263,7 @@ class ResultsTable(QTableView):
                     value_hex=data.hexval,
                     value_bin=data.binval,
                     address=register_address,
+                    address_bus_width_in_bytes=data.address_bus_width_in_bytes,
                 ),
             )
 

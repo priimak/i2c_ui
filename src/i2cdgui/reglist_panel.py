@@ -41,7 +41,7 @@ class RegisterDisplayData:
 def mk_registers_to_display(reg_list: RegList) -> list[RegisterDisplayData]:
     return [
         RegisterDisplayData(
-            address=f"0x{register.address:02X}",
+            address=f"0x{register.address:0{register.address_bus_width_bytes * 2}X}",
             name=register.name,
             fields=", ".join(register.get_field_names()),
             pure_name=register.name,
@@ -201,7 +201,7 @@ class RegInfoText(QTextEdit):
                 <table>
                 <tbody>
                 <tr><td>Register:</td><td colspan=5><p style='color: blue;'>{register.name}</p></td></tr>
-                <tr><td>Address:</td><td colspan=5><p style='color: blue;'>0x{register.address:02X}</p></td></tr>
+                <tr><td>Address:</td><td colspan=5><p style='color: blue;'>0x{register.address:0{register.address_bus_width_bytes * 2}X}</p></td></tr>
                 <tr><td>Width (bits):&nbsp;&nbsp;</td><td colspan=5><p style='color: blue;'>{register.width}</p></td></tr>
                 <tr><td>Raw data:&nbsp;&nbsp;</td><td colspan=5><p style='color: blue;'>{register.data.bin}</p></td></tr>
                 <tr><td colspan=6>Fields:</td></tr>
@@ -393,7 +393,9 @@ class RegListPanel(VBoxPanel):
         register = self.get_selected_register_name()
         if register is not None:
             r = self.app.project.reg_list.get_register_by_name(register.name)
-            self.app.read_register_address_str.set_value(f"0x{r.address:02X}")
+            self.app.read_register_address_str.set_value(
+                f"0x{r.address:0{r.address_bus_width_bytes * 2}X}"
+            )
             self.app.read_register_num_bytes.set_value(int(r.width / 8))
             self.app.read_register()
 

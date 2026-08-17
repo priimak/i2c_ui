@@ -136,14 +136,24 @@ class App:
     def scan(self) -> list[int]:
         return [] if self.i2c is None else self.i2c.scan()
 
+    @staticmethod
+    def get_address_width(register_address_str: str) -> int:
+        register_address_len = len(register_address_str)
+        return int(register_address_len / 2) + (register_address_len % 2)
+
     def read_register(self) -> None:
-        def get_reg_addr():
-            if self.read_register_address_str.value.strip() == "":
+        def get_reg_addr() -> tuple[int, int] | None:
+            register_address_str = (
+                self.read_register_address_str.value.strip().removeprefix("0x")
+            )
+            if register_address_str == "":
                 self.show_error("Register address is empty")
                 return None
             else:
                 try:
-                    return int(self.read_register_address_str.value, 16)
+                    return int(register_address_str, 16), App.get_address_width(
+                        register_address_str
+                    )
                 except ValueError:
                     self.show_error("Register address is not a hex number")
                     return None
@@ -152,8 +162,9 @@ class App:
         if reg_addr is not None:
             self.op_thread.commands.put(
                 ReadRegister(
-                    self.device_address,
-                    reg_addr,
+                    device_address=self.device_address,
+                    register_address=reg_addr[0],
+                    address_bus_width_in_bytes=reg_addr[1],
                     num_bytes=self.read_register_num_bytes.value,
                     highlight=True,
                 )
@@ -161,16 +172,20 @@ class App:
             self.op_thread.commands.put(HighlightOff(delay_millis=300))
 
     def write_register(self):
-        reg_address_str = self.write_register_address_str.value.strip()
         register_value_str = self.write_register_value_str.value.strip()
 
-        def get_reg_addr():
+        def get_reg_addr() -> tuple[int, int] | None:
+            reg_address_str = (
+                self.write_register_address_str.value.strip().removeprefix("0x")
+            )
             if reg_address_str == "":
                 self.show_error("Register address is empty")
                 return None
             else:
                 try:
-                    return int(reg_address_str, 16)
+                    return int(reg_address_str, 16), App.get_address_width(
+                        reg_address_str
+                    )
                 except ValueError:
                     self.show_error("Register address is not a hex number")
                     return None
@@ -205,13 +220,21 @@ class App:
 
         self.op_thread.commands.put(
             WriteRegister(
-                self.device_address, target_register_address, target_register_value
+                device_address=self.device_address,
+                register_address=target_register_address[0],
+                address_bus_width_in_bytes=target_register_address[1],
+                register_value=target_register_value,
             )
         )
         self.op_thread.commands.put(HighlightOff(delay_millis=300))
 
     def re_read_register_at_addr(
-        self, reg_addr: int, num_bytes: int, highlight: bool = True
+        self,
+        *,
+        reg_addr: int,
+        address_bus_width_in_bytes: int,
+        num_bytes: int,
+        highlight: bool = True,
     ) -> None:
         if self.device_address == -1:
             self.show_error("Please select device address to read registers from")
@@ -220,6 +243,7 @@ class App:
                 ReadRegister(
                     device_address=self.device_address,
                     register_address=reg_addr,
+                    address_bus_width_in_bytes=address_bus_width_in_bytes,
                     num_bytes=num_bytes,
                     highlight=highlight,
                 )
@@ -261,6 +285,8 @@ class App:
                 row.address
             )
             if register is None:
-                row.name_and_address = f"0x{row.address:02X}"
+                row.name_and_address = (
+                    f"0x{row.address:0{row.address_bus_width_in_bytes * 2}X}"
+                )
             else:
-                row.name_and_address = f"{register.name} @ 0x{register.address:02X}"
+                row.name_and_address = f"{register.name} @ 0x{register.address:0{register.address_bus_width_bytes * 2}X}"
