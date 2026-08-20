@@ -9,7 +9,7 @@ from PySide6.QtCore import QItemSelection, QModelIndex, QPersistentModelIndex, Q
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QLabel, QMessageBox, QTextEdit
 from pytide6 import HBoxPanel, Menu, PushButton, Splitter, VBoxPanel, W
-from rgscore import Register, RegList
+from rgscore import Register
 
 from i2cdgui.app import App
 from i2cdgui.gui_tools import (
@@ -38,18 +38,6 @@ class RegisterDisplayData:
     pure_name: str
 
 
-def mk_registers_to_display(reg_list: RegList) -> list[RegisterDisplayData]:
-    return [
-        RegisterDisplayData(
-            address=f"0x{register.address:0{register.address_bus_width_bytes * 2}X}",
-            name=register.name,
-            fields=", ".join(register.get_field_names()),
-            pure_name=register.name,
-        )
-        for register in reg_list.registers
-    ]
-
-
 class RegListModel(
     TableModelWithThreeColumns,
     TableModelAllSelectableAndEnabled,
@@ -58,16 +46,24 @@ class RegListModel(
     def __init__(self, app: App):
         super().__init__()
         self.app = app
-        self.registers_to_display = mk_registers_to_display(self.app.project.reg_list)
+        self.registers_to_display = self.mk_registers_to_display()
+
+    def mk_registers_to_display(self) -> list[RegisterDisplayData]:
+        return [
+            RegisterDisplayData(
+                address=f"0x{register.address:0{register.address_bus_width_bytes * 2}X}",
+                name=register.name,
+                fields=", ".join(register.get_field_names()),
+                pure_name=register.name,
+            )
+            for register in self.app.project.reg_list.registers
+        ]
 
     def regenerate_registers_to_display(self):
-        self.registers_to_display = mk_registers_to_display(self.app.project.reg_list)
+        self.registers_to_display = self.mk_registers_to_display()
 
     def headerData(self, section, orientation, /, role=...) -> Any:
-        if (
-            orientation == Qt.Orientation.Horizontal
-            and role == Qt.ItemDataRole.DisplayRole
-        ):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             match section:
                 case 0:
                     return "Address"
@@ -77,10 +73,7 @@ class RegListModel(
                     return "Fields"
                 case _:
                     return ""
-        elif (
-            orientation == Qt.Orientation.Vertical
-            and role == Qt.ItemDataRole.DisplayRole
-        ):
+        elif orientation == Qt.Orientation.Vertical and role == Qt.ItemDataRole.DisplayRole:
             return None
         else:
             return super().headerData(section, orientation, role)
@@ -88,9 +81,7 @@ class RegListModel(
     def rowCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return len(self.registers_to_display)
 
-    def data(
-        self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...
-    ) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             register = self.registers_to_display[index.row()]
             match index.column():
@@ -110,14 +101,12 @@ class RegListModel(
         self.beginResetModel()
         self.registers_to_display.clear()
         if char_filter == []:
-            self.registers_to_display = mk_registers_to_display(
-                self.app.project.reg_list
-            )
+            self.registers_to_display = self.mk_registers_to_display()
             self.endResetModel()
             post_filter_action()
             return
 
-        registers_to_display_input = mk_registers_to_display(self.app.project.reg_list)
+        registers_to_display_input = self.mk_registers_to_display()
 
         for register in registers_to_display_input:
             new_register_address = apply_filter_to_text(char_filter, register.address)
@@ -212,16 +201,6 @@ class RegInfoText(QTextEdit):
             )
 
 
-class RegListTableView(ListTableView):
-    def __init__(
-        self,
-        table_model: RegListModel,
-        pass_key_press_event: Callable[[], Callable[[QKeyEvent], None]],
-        on_double_clicked: Callable[[QModelIndex], None] | None,
-    ):
-        super().__init__(table_model, pass_key_press_event, on_double_clicked)
-
-
 class RegListPanel(VBoxPanel):
     def __init__(self, app: App):
         super().__init__(background_color="lightyellow", margins=(7, 7, 7, 0))
@@ -246,9 +225,7 @@ class RegListPanel(VBoxPanel):
         )
         self.reglist_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.reglist_table.customContextMenuRequested.connect(
-            lambda pos: self.context_menu.popup(
-                self.reglist_table.viewport().mapToGlobal(pos)
-            )
+            lambda pos: self.context_menu.popup(self.reglist_table.viewport().mapToGlobal(pos))
         )
 
         self.search_field = InTableSearchField(
@@ -259,9 +236,7 @@ class RegListPanel(VBoxPanel):
 
         def select_register(register: Register) -> None:
             try:
-                for row, rdd in enumerate(
-                    self.reglist_table.table_model.registers_to_display
-                ):
+                for row, rdd in enumerate(self.reglist_table.table_model.registers_to_display):
                     if rdd.pure_name == register.name:
                         self.reglist_table.selectRow(row)
                         return
@@ -275,12 +250,8 @@ class RegListPanel(VBoxPanel):
         def selection_changed(selected_item: QItemSelection, _):
             selected_indexes = selected_item.indexes()
             if selected_indexes is not None and len(selected_indexes) > 0:
-                register_name = self.reglist_table.table_model.registers_to_display[
-                    selected_indexes[0].row()
-                ].pure_name
-                self.register_text.show_register(
-                    app.project.reg_list.get_register_by_name(register_name)
-                )
+                register_name = self.reglist_table.table_model.registers_to_display[selected_indexes[0].row()].pure_name
+                self.register_text.show_register(app.project.reg_list.get_register_by_name(register_name))
 
         self.reglist_table.selectionModel().selectionChanged.connect(selection_changed)
 
@@ -299,14 +270,10 @@ class RegListPanel(VBoxPanel):
                         on_clicked=lambda: NewRegDefDialog(self.app).exec(),
                     ),
                     PushButton("Edit register", on_clicked=self.edit_selected_register),
-                    PushButton(
-                        "Delete register", on_clicked=self.delete_selected_register
-                    ),
+                    PushButton("Delete register", on_clicked=self.delete_selected_register),
                     QLabel("        "),
                     PushButton("Read register", on_clicked=self.read_selected_register),
-                    PushButton(
-                        "Write register", on_clicked=self.write_selected_register
-                    ),
+                    PushButton("Write register", on_clicked=self.write_selected_register),
                     W(stretch=1),
                 ],
                 margins=0,
@@ -318,10 +285,7 @@ class RegListPanel(VBoxPanel):
         self.app.registers_values_changed = self.registers_values_changed
 
     def registers_values_changed(self, address: int):
-        if (
-            self.register_text.register is not None
-            and self.register_text.register.address == address
-        ):
+        if self.register_text.register is not None and self.register_text.register.address == address:
             self.register_text.reload_register()
 
     def request_reglist_reload(self):
@@ -351,9 +315,7 @@ class RegListPanel(VBoxPanel):
             selected_row = selected_indexes[0].row()
             return RowAndRegisterName(
                 row=selected_row,
-                name=self.reglist_table.table_model.registers_to_display[
-                    selected_row
-                ].pure_name,
+                name=self.reglist_table.table_model.registers_to_display[selected_row].pure_name,
             )
         else:
             return None
@@ -393,9 +355,7 @@ class RegListPanel(VBoxPanel):
         register = self.get_selected_register_name()
         if register is not None:
             r = self.app.project.reg_list.get_register_by_name(register.name)
-            self.app.read_register_address_str.set_value(
-                f"0x{r.address:0{r.address_bus_width_bytes * 2}X}"
-            )
+            self.app.read_register_address_str.set_value(f"0x{r.address:0{r.address_bus_width_bytes * 2}X}")
             self.app.read_register_num_bytes.set_value(int(r.width / 8))
             self.app.read_register()
 

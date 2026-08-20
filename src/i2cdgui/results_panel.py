@@ -28,10 +28,7 @@ class ResultsTableModel(QAbstractTableModel):
         return self.app.project
 
     def headerData(self, section, orientation, /, role=...):
-        if (
-            orientation == Qt.Orientation.Horizontal
-            and role == Qt.ItemDataRole.DisplayRole
-        ):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             match section:
                 case 0:
                     return "Name/Addr"
@@ -41,10 +38,7 @@ class ResultsTableModel(QAbstractTableModel):
                     return "Val(Bin)"
                 case _:
                     return ""
-        elif (
-            orientation == Qt.Orientation.Vertical
-            and role == Qt.ItemDataRole.DisplayRole
-        ):
+        elif orientation == Qt.Orientation.Vertical and role == Qt.ItemDataRole.DisplayRole:
             return None
         else:
             return super().headerData(section, orientation, role)
@@ -55,9 +49,7 @@ class ResultsTableModel(QAbstractTableModel):
     def columnCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return 3
 
-    def data(
-        self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...
-    ) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...) -> Any:
         if index.isValid():
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 row = self.project.get_results_at_row(index.row())
@@ -66,11 +58,7 @@ class ResultsTableModel(QAbstractTableModel):
                 else:
                     return row.get_value_at_column(index.column())
             elif role == Qt.ItemDataRole.BackgroundRole:
-                return (
-                    self.loading_highlight_color
-                    if index.row() in self.highlighted_rows
-                    else self.default_row_color
-                )
+                return self.loading_highlight_color if index.row() in self.highlighted_rows else self.default_row_color
             else:
                 return None
         else:
@@ -111,9 +99,7 @@ class ResultsTable(QTableView):
         )
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(
-            lambda pos: self.context_menu.popup(self.viewport().mapToGlobal(pos))
-        )
+        self.customContextMenuRequested.connect(lambda pos: self.context_menu.popup(self.viewport().mapToGlobal(pos)))
         self.reloading_on = reloading_on
         self.reloading_off = reloading_off
         self.app.connect_re_read_all_registers(self.re_read_all_registers)
@@ -199,15 +185,14 @@ class ResultsTable(QTableView):
                 ReadRegister(
                     device_address=self.app.device_address,
                     register_address=row.address,
+                    address_bus_width_in_bytes=row.address_bus_width_in_bytes,
                     num_bytes=int(len(row.value_bin) / 8),
                     highlight=highlight_individual,
                 )
             )
 
         if self.app.re_read_all_period_millis > 0:
-            self.app.op_thread.commands.put(
-                RequestReadAllRegisters(delay_millis=self.app.re_read_all_period_millis)
-            )
+            self.app.op_thread.commands.put(RequestReadAllRegisters(delay_millis=self.app.re_read_all_period_millis))
         else:
             self.app.op_thread.commands.put(HighlightOff(delay_millis=300))
 
@@ -231,15 +216,11 @@ class ResultsTable(QTableView):
         register_address = int(data.register_address, 16)
         if row == -1:
             # insert new row
-            register = self.app.project.reg_list.get_register_by_address(
-                register_address
-            )
+            register = self.app.project.reg_list.get_register_by_address(register_address)
             self.model.project.add_result(
                 RawResult(
                     name_and_address=(
-                        data.register_address
-                        if register is None
-                        else f"{register.name} @ {data.register_address}"
+                        data.register_address if register is None else f"{register.name} @ {data.register_address}"
                     ),
                     value_hex=data.hexval,
                     value_bin=data.binval,
@@ -249,16 +230,12 @@ class ResultsTable(QTableView):
             )
             row = self.model.indexOfByAddr(data.register_address)
         else:
-            register = self.app.project.reg_list.get_register_by_address(
-                register_address
-            )
+            register = self.app.project.reg_list.get_register_by_address(register_address)
             self.model.project.replace_result(
                 row,
                 RawResult(
                     name_and_address=(
-                        data.register_address
-                        if register is None
-                        else f"{register.name} @ {data.register_address}"
+                        data.register_address if register is None else f"{register.name} @ {data.register_address}"
                     ),
                     value_hex=data.hexval,
                     value_bin=data.binval,
@@ -297,9 +274,7 @@ class ResultsPanel(VBoxPanel):
         self.re_reading_label = Label("    ")
         self.re_reading_label.setProperty("on", False)
 
-        self.app.toggle_reloading_label_highlight = (
-            self.toggle_reloading_label_highlight
-        )
+        self.app.toggle_reloading_label_highlight = self.toggle_reloading_label_highlight
 
         def reloading_on():
             self.re_reading_label.setStyleSheet("background-color: green")
@@ -314,9 +289,7 @@ class ResultsPanel(VBoxPanel):
         self.addWidgets(
             HBoxPanel(
                 [
-                    PushButton(
-                        "Re-Read All", on_clicked=results_table.re_read_all_registers
-                    ),
+                    PushButton("Re-Read All", on_clicked=results_table.re_read_all_registers),
                     # ComboBox(
                     #     items=["once", "every 0.25s", "every 0.5s", "every 1s"],
                     #     on_text_change=freq_change,

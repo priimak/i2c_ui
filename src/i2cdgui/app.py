@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from enum import Enum
 
 from bitstring import BitArray
 from i2c_api import I2CLogger, I2CMaster
@@ -24,6 +25,15 @@ class InAppI2CLogger(I2CLogger):
         self.message_appender(message)
 
 
+class Foo(Enum):
+    A = (1,)
+    B = 2
+    C = 8
+
+
+Variable(Foo.A, name="state", valid_values=[Foo.A, Foo.B, Foo.C])
+
+
 class App:
     def __init__(self, persistence: AppPersistence, q_application: QApplication):
         self._i2c_driver: I2CMaster | None = None
@@ -34,9 +44,7 @@ class App:
         self.i2c_master_changed: list[Callable[[I2CMaster], None]] = []
 
         self.device_address: int = -1
-        self.read_register_num_bytes: Variable[int] = Variable(
-            1, valid_values=[1, 2, 3, 4]
-        )
+        self.read_register_num_bytes: Variable[int] = Variable(1, valid_values=[1, 2, 3, 4])
         self.read_register_address_str = Variable[str]("")
 
         self.write_register_address_str = Variable[str]("")
@@ -45,25 +53,22 @@ class App:
 
         self.show_error: Callable[[str], None] = lambda _: None
 
-        self.show_read_register_results: Callable[[str, str, str, bool], None] = (
-            lambda a, b, c, d: None
-        )
+        self.show_read_register_results: Callable[[str, str, str, bool], None] = lambda a, b, c, d: None
         self.exit_application: list[Callable[[], None]] = [lambda: None]
         self.re_read_all_period_millis: int = -1
         self.toggle_reloading_label_highlight: Callable[[], None] = lambda: None
         self.reloading_label_highlight_off: Callable[[], None] = lambda: None
-        self.update_project_selector_current_project: Callable[[str], None] = lambda _: (
-            None
-        )
+        self.update_project_selector_current_project: Callable[[str], None] = lambda _: None
         self.request_results_reload: Callable[[], None] = lambda: None
         self.request_reglist_reload: Callable[[], None] = lambda: None
-        self.request_reglist_select_register: Callable[[Register], None] = lambda _: (
-            None
-        )
+        self.request_reglist_select_register: Callable[[Register], None] = lambda _: None
         self.show_last_i2c_log_message: Callable[[list], None] = lambda _: None
 
         # called by results panel when register is read and result are (re)displayed
         self.registers_values_changed: Callable[[int], None] = lambda _: None
+
+        self.append_custom_commands_log_stdout: Callable[[str], None] = lambda _: None
+        self.request_commands_reload: Callable[[], None] = lambda: None
 
         self.op_thread = I2COpThread()
         self.op_thread.start()
@@ -76,10 +81,7 @@ class App:
         if last_open_project_name not in all_available_projects:
             last_open_project_name = "default"
 
-        if (
-            last_open_project_name == "default"
-            and "default" not in all_available_projects
-        ):
+        if last_open_project_name == "default" and "default" not in all_available_projects:
             # create "default" project if it does not exit
             self.projects.new_project("default")
 
@@ -92,14 +94,10 @@ class App:
     def connect_show_error(self, show_error: Callable[[str], None]):
         self.op_thread.show_error.connect(show_error)
 
-    def connect_show_register_value(
-        self, show_register_value: Callable[[ShowRegSignalData], None]
-    ):
+    def connect_show_register_value(self, show_register_value: Callable[[ShowRegSignalData], None]):
         self.op_thread.show_register_value.connect(show_register_value)
 
-    def connect_highlight_register_at_addr(
-        self, highlight_register_at_addr: Callable[[str], None]
-    ):
+    def connect_highlight_register_at_addr(self, highlight_register_at_addr: Callable[[str], None]):
         self.op_thread.highlight_register_at_addr.connect(highlight_register_at_addr)
 
     def connect_re_read_all_registers(self, re_read_all_registers: Callable[[], None]):
@@ -126,9 +124,7 @@ class App:
             if self.port is None:
                 self._i2c_driver = DummyI2CMaster()
             else:
-                self._i2c_driver = I2CMasterI2CDriver(
-                    I2CDriver(self.port), logger=self.i2c_logger
-                )
+                self._i2c_driver = I2CMasterI2CDriver(I2CDriver(self.port), logger=self.i2c_logger)
                 self.op_thread._i2c_driver = self._i2c_driver
                 for c in self.i2c_master_changed:
                     c(self._i2c_driver)
@@ -143,17 +139,13 @@ class App:
 
     def read_register(self) -> None:
         def get_reg_addr() -> tuple[int, int] | None:
-            register_address_str = (
-                self.read_register_address_str.value.strip().removeprefix("0x")
-            )
+            register_address_str = self.read_register_address_str.value.strip().removeprefix("0x")
             if register_address_str == "":
                 self.show_error("Register address is empty")
                 return None
             else:
                 try:
-                    return int(register_address_str, 16), App.get_address_width(
-                        register_address_str
-                    )
+                    return int(register_address_str, 16), App.get_address_width(register_address_str)
                 except ValueError:
                     self.show_error("Register address is not a hex number")
                     return None
@@ -175,17 +167,13 @@ class App:
         register_value_str = self.write_register_value_str.value.strip()
 
         def get_reg_addr() -> tuple[int, int] | None:
-            reg_address_str = (
-                self.write_register_address_str.value.strip().removeprefix("0x")
-            )
+            reg_address_str = self.write_register_address_str.value.strip().removeprefix("0x")
             if reg_address_str == "":
                 self.show_error("Register address is empty")
                 return None
             else:
                 try:
-                    return int(reg_address_str, 16), App.get_address_width(
-                        reg_address_str
-                    )
+                    return int(reg_address_str, 16), App.get_address_width(reg_address_str)
                 except ValueError:
                     self.show_error("Register address is not a hex number")
                     return None
@@ -281,12 +269,10 @@ class App:
 
     def update_results_display_data(self):
         for row in self.project.results:
-            register: Register | None = self.project.reg_list.get_register_by_address(
-                row.address
-            )
+            register: Register | None = self.project.reg_list.get_register_by_address(row.address)
             if register is None:
-                row.name_and_address = (
-                    f"0x{row.address:0{row.address_bus_width_in_bytes * 2}X}"
-                )
+                row.name_and_address = f"0x{row.address:0{row.address_bus_width_in_bytes * 2}X}"
             else:
-                row.name_and_address = f"{register.name} @ 0x{register.address:0{register.address_bus_width_bytes * 2}X}"
+                row.name_and_address = (
+                    f"{register.name} @ 0x{register.address:0{register.address_bus_width_bytes * 2}X}"
+                )

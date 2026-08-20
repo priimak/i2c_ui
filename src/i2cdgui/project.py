@@ -1,13 +1,45 @@
+import base64
 import json
+import marshal
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from types import CodeType
 from typing import Self
 
 from rgscore import RegList
 
 PROJECT_RE = re.compile("^[a-zA-Z0-9_]+$")
 PROJECT_VALID_CHAR_RE = re.compile("[a-zA-Z0-9_]")
+
+
+@dataclass
+class CustomCommand:
+    label: str
+    source_code: str
+    compiled_code: CodeType
+    compiled_code_txt: str | None = None
+
+    def __post_init__(self):
+        if self.compiled_code_txt is None:
+            self.compiled_code_txt = base64.encodebytes(marshal.dumps(self.compiled_code)).decode("utf-8")
+
+    def to_dict(self) -> dict[str, str]:
+        assert self.compiled_code_txt is not None
+        return {
+            "label": self.label,
+            "source_code": self.source_code,
+            "compiled_code": self.compiled_code_txt,
+        }
+
+    @staticmethod
+    def from_dict(data: dict[str, str]) -> "CustomCommand":
+        return CustomCommand(
+            label=data["label"],
+            source_code=data["source_code"],
+            compiled_code=marshal.loads(base64.decodebytes(data["compiled_code"].encode("utf-8"))),
+            compiled_code_txt=data["compiled_code"],
+        )
 
 
 @dataclass
@@ -50,12 +82,17 @@ class Project:
         self.version_json_path = self.dir / "version.json"
         self.reg_list_path = self.dir / "regList.json"
         self.results_path = self.dir / "results.json"
+        self.commands_path = self.dir / "commands.json"
+        if not self.commands_path.exists():
+            self.commands_path.write_text("[]")
 
         self.reg_list = RegList()
         if not self.reg_list_path.exists():
             self.save_reglist()
 
         self.results: list[RawResult] = []
+        self.commands: list[CustomCommand] = []
+        self.commands_by_label: dict[str, CustomCommand] = dict()
 
     def get_raw_result_for_address(self, register_address: int) -> RawResult | None:
         for row in self.results:
@@ -63,10 +100,33 @@ class Project:
                 return row
         return None
 
+    def add_custom_command(self, command: CustomCommand):
+        self.commands.append(command)
+        self.commands.sort(key=lambda cmd: cmd.label)
+        self.commands_by_label[command.label] = command
+        self.save_commands()
+
+    def update_custom_command(self, original_cmd: CustomCommand, new_cmd: CustomCommand):
+        self.delete_custom_command(original_cmd.label, auto_save=False)
+        self.add_custom_command(new_cmd)
+
+    def get_custom_command_by_label(self, label: str) -> CustomCommand | None:
+        return self.commands_by_label.get(label, None)
+
+    def delete_custom_command(self, label: str, auto_save: bool = True):
+        match self.get_custom_command_by_label(label):
+            case CustomCommand() as cmd:
+                try:
+                    idx = self.commands.index(cmd)
+                    del self.commands[idx]
+                    del self.commands_by_label[label]
+                    if auto_save:
+                        self.save_commands()
+                except ValueError:
+                    pass
+
     def copy_to(self, target_project: "Project"):
-        target_project.version_json_path.write_bytes(
-            self.version_json_path.read_bytes()
-        )
+        target_project.version_json_path.write_bytes(self.version_json_path.read_bytes())
         target_project.reg_list_path.write_bytes(self.reg_list_path.read_bytes())
         target_project.results_path.write_bytes(self.results_path.read_bytes())
 
@@ -76,9 +136,13 @@ class Project:
             raise RuntimeError(f"Unable to load project version {version}")
         self.reg_list = RegList.from_json_def(self.reg_list_path.read_text())
 
-        self.results = [
-            RawResult(**row) for row in json.loads(self.results_path.read_text())
-        ]
+        self.results = [RawResult(**row) for row in json.loads(self.results_path.read_text())]
+        self.commands.clear()
+        self.commands.extend([CustomCommand.from_dict(row) for row in json.loads(self.commands_path.read_text())])
+        self.commands_by_label.clear()
+        for cmd in self.commands:
+            self.commands_by_label[cmd.label] = cmd
+
         return self
 
     def save(self) -> Self:
@@ -86,6 +150,7 @@ class Project:
             self.version_json_path.write_text(json.dumps({"version": Project.version}))
             self.save_results()
             self.save_reglist()
+            self.save_commands()
         return self
 
     def save_results(self):
@@ -93,6 +158,9 @@ class Project:
 
     def save_reglist(self):
         self.reg_list_path.write_text(self.reg_list.to_json_def())
+
+    def save_commands(self):
+        self.commands_path.write_text(json.dumps([cmd.to_dict() for cmd in self.commands]))
 
     def add_result(self, row: RawResult):
         self.results.append(row)
@@ -139,9 +207,7 @@ class Projects:
 
     def new_project(self, name: str) -> Project:
         if not PROJECT_RE.match(name):
-            raise ValueError(
-                "Project name must consist of only letters, numbers and underscore characters."
-            )
+            raise ValueError("Project name must consist of only letters, numbers and underscore characters.")
         dir = self.projects_dir / name
         if dir.exists():
             raise RuntimeError(f"Project [{name}] already exists.")
@@ -177,8 +243,6 @@ class Projects:
                 open_projects_history = json.loads(self.projects_file_path.read_text())
                 if name in open_projects_history:
                     open_projects_history.remove(name)
-                    self.projects_file_path.write_text(
-                        json.dumps(open_projects_history)
-                    )
+                    self.projects_file_path.write_text(json.dumps(open_projects_history))
 
             dir.rmdir()

@@ -23,6 +23,7 @@ from sprats.config import AppPersistence
 
 from i2cdgui.app import App
 from i2cdgui.commands_panel import CommandsPanel
+from i2cdgui.custom_commands.custom_commands_panel import CustomCommandsPanel
 from i2cdgui.find_actions_dialog import FindActionDialog
 from i2cdgui.i2c_op_thread import Quit
 from i2cdgui.log_line_label import LogLineLabel
@@ -78,9 +79,7 @@ class I2CDriverWindow(MainWindow):
         self.info_panel = InfoPanel(app)
 
         self.res_table = ResultsPanel(self.app)
-        left_panel = VBoxPanel(
-            widgets=[self.res_table], background_color="gray", margins=1
-        )
+        left_panel = VBoxPanel(widgets=[self.res_table], background_color="gray", margins=1)
 
         cpanel = CommandsPanel(app)
         cpanel.setBackgroundColor("lightgreen")
@@ -89,9 +88,9 @@ class I2CDriverWindow(MainWindow):
         right_bottom_panel.setDocumentMode(True)
         self.reg_list_panel = RegListPanel(app)
         right_bottom_panel.addTab(self.reg_list_panel, "RegList")
-        right_bottom_panel.addTab(
-            VBoxPanel(background_color="lightyellow"), "Variables and Commands"
-        )
+
+        self.custom_commands_panel = CustomCommandsPanel(app)
+        right_bottom_panel.addTab(self.custom_commands_panel, "User defined commands")
 
         right_panel = VBoxPanel(
             widgets=[
@@ -140,17 +139,13 @@ class I2CDriverWindow(MainWindow):
         state: QByteArray = self.hsplitter.saveState()
         self.app.persistence.state.set_value(
             "main_splitter_state",
-            state.toBase64(QByteArray.Base64Option.Base64Encoding)
-            .data()
-            .decode("utf-8"),
+            state.toBase64(QByteArray.Base64Option.Base64Encoding).data().decode("utf-8"),
         )
 
         state: QByteArray = self.reg_list_panel.splitter.saveState()
         self.app.persistence.state.set_value(
             "reg_list_splitter_state",
-            state.toBase64(QByteArray.Base64Option.Base64Encoding)
-            .data()
-            .decode("utf-8"),
+            state.toBase64(QByteArray.Base64Option.Base64Encoding).data().decode("utf-8"),
         )
 
         self.app.project.save()
@@ -159,14 +154,10 @@ class I2CDriverWindow(MainWindow):
     def restore(self):
         spl_state = self.app.persistence.state.get_value("main_splitter_state")
         if spl_state is not None:
-            self.hsplitter.restoreState(
-                QByteArray.fromBase64(spl_state.encode("utf-8"))
-            )
+            self.hsplitter.restoreState(QByteArray.fromBase64(spl_state.encode("utf-8")))
         spl_state = self.app.persistence.state.get_value("reg_list_splitter_state")
         if spl_state is not None:
-            self.reg_list_panel.splitter.restoreState(
-                QByteArray.fromBase64(spl_state.encode("utf-8"))
-            )
+            self.reg_list_panel.splitter.restoreState(QByteArray.fromBase64(spl_state.encode("utf-8")))
 
     def show_error(self, message: str) -> None:
         QMessageBox.critical(None, "Error", message)
@@ -198,9 +189,7 @@ def main():
         win.raise_()
         win.restore()
         if win.info_panel.com_port_selector.count() == 0:
-            win.app.show_error(
-                "I2C Master device not found. Connect device and restart application."
-            )
+            win.app.show_error("I2C Master device not found. Connect device and restart application.")
         application.init()
 
         sys.exit(app.exec())
