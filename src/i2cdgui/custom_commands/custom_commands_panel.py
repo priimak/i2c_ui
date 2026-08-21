@@ -5,8 +5,8 @@ from typing import Any
 
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QLabel, QTextEdit
-from pytide6 import HBoxPanel, PushButton, Splitter, VBoxPanel, W
+from PySide6.QtWidgets import QLabel, QMessageBox, QTextEdit
+from pytide6 import HBoxPanel, Menu, PushButton, Splitter, VBoxPanel, W
 from rgscore import RLinkI2C
 from sprats.collections import Variable
 
@@ -28,6 +28,10 @@ from i2cdgui.project import CustomCommand
 class CommandLabelAndId:
     label: str
     id: str
+
+
+# TODO: implement that pressing Enter/Return executes command
+# TODO: implement that pressing Del attempts to delete command and select next nearest row
 
 
 class CommandsListModel(
@@ -68,22 +72,24 @@ class CommandsListModel(
 
     def apply_filter(self, filter_text: str, post_filter_action: Callable[[], Any]):
         char_filter = list(filter_text)
-        self.beginResetModel()
-        self.commands_to_display.clear()
-        if char_filter == []:
-            self.registers_to_display = self.mk_commands_to_display()
+        try:
+            self.beginResetModel()
+            self.commands_to_display.clear()
+            if char_filter == []:
+                self.commands_to_display = self.mk_commands_to_display()
+                self.endResetModel()
+                post_filter_action()
+                return
+
+            commands_to_display_input = self.mk_commands_to_display()
+
+            for command in commands_to_display_input:
+                new_command_label = apply_filter_to_text(char_filter, command.label)
+                if new_command_label is not None:
+                    self.commands_to_display.append(CommandLabelAndId(new_command_label, command.label))
+        finally:
             self.endResetModel()
-            post_filter_action()
-            return
 
-        commands_to_display_input = self.mk_commands_to_display()
-
-        for command in commands_to_display_input:
-            new_command_label = apply_filter_to_text(char_filter, command.label)
-            if new_command_label is not None:
-                self.commands_to_display.append(CommandLabelAndId(new_command_label, command.label))
-
-        self.endResetModel()
         post_filter_action()
 
 
@@ -104,6 +110,19 @@ class CustomCommandsPanel(VBoxPanel):
             table_model=CommandsListModel(app),
             pass_key_press_event=self.pass_key_press_event,
             on_double_clicked=self.on_commands_table_double_clicked,
+        )
+
+        self.context_menu = Menu(
+            parent=self,
+            actions=[
+                ("Run", self.eval_selected_command),
+                ("Edit", self.edit_selected_command),
+                ("Delete", self.delete_selected_command),
+            ],
+        )
+        self.commands_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.commands_table.customContextMenuRequested.connect(
+            lambda pos: self.context_menu.popup(self.commands_table.viewport().mapToGlobal(pos))
         )
 
         self.results_text = ResultsText(app)
@@ -128,10 +147,7 @@ class CustomCommandsPanel(VBoxPanel):
                 widgets=[
                     PushButton("Define new command", on_clicked=self.define_new_command),
                     PushButton("Edit selected command", on_clicked=self.edit_selected_command),
-                    PushButton(
-                        "Delete selected command",
-                        on_clicked=self.delete_selected_command,
-                    ),
+                    PushButton("Delete selected command", on_clicked=self.delete_selected_command),
                     QLabel("        "),
                     PushButton("Run command", on_clicked=self.eval_selected_command),
                     W(stretch=1),
@@ -215,10 +231,18 @@ class CustomCommandsPanel(VBoxPanel):
     def delete_selected_command(self):
         match self.get_selected_command():
             case CustomCommand() as cmd:
-                self.commands_table.table_model.beginResetModel()
-                self.app.project.delete_custom_command(cmd.label)
-                self.commands_table.table_model.regenerate_commands_to_display()
-                self.commands_table.table_model.endResetModel()
+                ret = QMessageBox.question(
+                    self.app.main_window,
+                    "Delete custom command?",
+                    "Please confirm that you want to delete this command?",
+                    QMessageBox.StandardButton.Yes,
+                    QMessageBox.StandardButton.No,
+                )
+                if ret == QMessageBox.StandardButton.Yes:
+                    self.commands_table.table_model.beginResetModel()
+                    self.app.project.delete_custom_command(cmd.label)
+                    self.commands_table.table_model.regenerate_commands_to_display()
+                    self.commands_table.table_model.endResetModel()
 
     def edit_selected_command(self):
         match self.get_selected_command():

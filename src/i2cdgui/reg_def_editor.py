@@ -97,17 +97,13 @@ class RegisterPrototype:
         if self.name is None or self.name.strip() == "":
             raise ValueError("Register must have a name")
         elif not Register.register_name_re.match(self.name):
-            raise ValueError(
-                "Register name must not be empty and contain only numbers, letters and (_) underscores."
-            )
+            raise ValueError("Register name must not be empty and contain only numbers, letters and (_) underscores.")
         elif self.__address_str in ["", "0x"]:
             raise ValueError("Register must have an address")
         elif self.model == []:
             raise ValueError("Register must have at least one field")
         elif len([fd for fd in self.model if fd.width == 0]) > 0:
-            raise ValueError(
-                "Every field must have bits that it is picking from the register"
-            )
+            raise ValueError("Every field must have bits that it is picking from the register")
         elif len([fd for fd in self.model if fd.name.strip() == ""]) > 0:
             raise ValueError("Every field must have a name")
         else:
@@ -116,7 +112,6 @@ class RegisterPrototype:
                 address=self.address,
                 address_bus_width_bytes=self.address_bus_width_bytes,
                 name=self.name,
-                link=None,
                 model=self.model,
             )
 
@@ -137,9 +132,7 @@ class AddressInput(LineEdit):
 
     def __init__(self, register: RegisterPrototype):
         super().__init__(
-            text=""
-            if register.address is None
-            else f"0x{register.address:0{register.address_bus_width_bytes * 2}X}",
+            text="" if register.address is None else f"0x{register.address:0{register.address_bus_width_bytes * 2}X}",
             with_fixed_width_for_text="0xFFFF",
             validator=QRegularExpressionValidator("^(0x)?[0-9a-fA-F]{0,4}$"),
             on_text_change=register.set_address,
@@ -189,9 +182,7 @@ class DefRegEditor(Dialog):
 
         def add_new_field():
             self.remove_all_fields_gui_elements()
-            self.register_proto.model.append(
-                FieldDef(name="", offset=0, signed="U", width=0, fractional=0, rw=True)
-            )
+            self.register_proto.model.append(FieldDef(name="", offset=0, signed="U", width=0, fractional=0, rw=True))
             self.register_proto.gui_model.clear()
             self.build_fields_panel(self.fields_panel)
 
@@ -208,9 +199,7 @@ class DefRegEditor(Dialog):
                             ),
                             Label("  Addr"),
                             AddressInput(self.register_proto),
-                            Label(
-                                f"  This register is {self.register_proto.width} bits wide"
-                            ),
+                            Label(f"  This register is {self.register_proto.width} bits wide"),
                             W(stretch=1),
                         ],
                         margins=0,
@@ -234,12 +223,8 @@ class DefRegEditor(Dialog):
                     HBoxPanel(
                         [
                             W(stretch=1),
-                            PushButton(
-                                "Ok", on_clicked=self.save_register, auto_default=False
-                            ),
-                            PushButton(
-                                "Cancel", on_clicked=self.close, auto_default=False
-                            ),
+                            PushButton("Ok", on_clicked=self.save_register, auto_default=False),
+                            PushButton("Cancel", on_clicked=self.close, auto_default=False),
                         ],
                         margins=0,
                     ),
@@ -263,12 +248,8 @@ class DefRegEditor(Dialog):
                 self.app.project.reg_list.add(new_register)
             else:
                 # we are editing register
-                original_register = self.app.project.reg_list.get_register_by_name(
-                    self.original_register_name
-                )
-                self.app.project.reg_list.update_register_def(
-                    original_register, new_register
-                )
+                original_register = self.app.project.reg_list.get_register_by_name(self.original_register_name)
+                self.app.project.reg_list.update_register_def(original_register, new_register)
 
             self.app.request_reglist_reload()
             self.app.request_reglist_select_register(new_register)
@@ -283,9 +264,7 @@ class DefRegEditor(Dialog):
 
         def other_used_bits(but_fd: FieldDef) -> set[int]:
             other_fields = [fd for fd in self.register_proto.model if fd is not but_fd]
-            used_register_bits = [
-                set(range(fd.offset, fd.offset + fd.width)) for fd in other_fields
-            ]
+            used_register_bits = [set(range(fd.offset, fd.offset + fd.width)) for fd in other_fields]
             return reduce(lambda acc, v: acc | v, used_register_bits, set())
 
         def mk_bare_cb(field_idx: int, offset: int) -> CheckBox:
@@ -329,10 +308,7 @@ class DefRegEditor(Dialog):
                     field_name_input_field=FieldNameInput(
                         field_def.name, on_text_change=mk_field_name_setter(field_def)
                     ),
-                    checkboxes=[
-                        mk_bare_cb(field_idx, offset)
-                        for offset in range(self.register_proto.width)
-                    ],
+                    checkboxes=[mk_bare_cb(field_idx, offset) for offset in range(self.register_proto.width)],
                     width_label=Label(f"{field_def.width}."),
                     rw_selector=ComboBox(
                         items=["rw", "ro"],
@@ -382,19 +358,13 @@ class DefRegEditor(Dialog):
                             field_def.width = 1 if on else 0
 
                         # update numerical type width label
-                        self.register_proto.gui_model[field_idx].width_label.setText(
-                            f"{field_def.width}."
-                        )
+                        self.register_proto.gui_model[field_idx].width_label.setText(f"{field_def.width}.")
 
                         # now update gui checkboxes
-                        ids_checked = set(
-                            range(field_def.offset, field_def.end_offset() + 1)
-                        )
+                        ids_checked = set(range(field_def.offset, field_def.end_offset() + 1))
                         try:
                             self.cb_toggle_enabled = False
-                            for cb in self.register_proto.gui_model[
-                                field_idx
-                            ].checkboxes:
+                            for cb in self.register_proto.gui_model[field_idx].checkboxes:
                                 idx: int = cb.property("offset")
                                 cb.setChecked(idx in ids_checked)
                         finally:
@@ -403,13 +373,9 @@ class DefRegEditor(Dialog):
                         # now update other fields disabling checkboxes
                         for j, other_field_def in enumerate(self.register_proto.model):
                             if j != field_idx:
-                                bits_to_disable: set[int] = other_used_bits(
-                                    other_field_def
-                                )
+                                bits_to_disable: set[int] = other_used_bits(other_field_def)
                                 for cb in self.register_proto.gui_model[j].checkboxes:
-                                    cb.setEnabled(
-                                        cb.property("offset") not in bits_to_disable
-                                    )
+                                    cb.setEnabled(cb.property("offset") not in bits_to_disable)
 
                     return cb_toggled
 
@@ -417,10 +383,7 @@ class DefRegEditor(Dialog):
 
                 return cb
 
-            cbs = [
-                mk_cb(i, bits_to_disable, field_def)
-                for i in range(self.register_proto.width)[::-1]
-            ]
+            cbs = [mk_cb(i, bits_to_disable, field_def) for i in range(self.register_proto.width)[::-1]]
 
             def mk_delete_action(idx: int) -> Callable[[], None]:
                 def delete_action():
@@ -492,21 +455,15 @@ class NewRegDefDialog(Dialog):
                 [
                     HBoxPanel(
                         [
-                            Label(
-                                "How wide (in number of bits) do you want this register to be?"
-                            ),
+                            Label("How wide (in number of bits) do you want this register to be?"),
                             ComboBox(reactive_variable=self.bit_width),
                         ]
                     ),
                     HBoxPanel(
                         [
                             W(stretch=1),
-                            PushButton(
-                                "Ok", on_clicked=open_edit_dialog, auto_default=True
-                            ),
-                            PushButton(
-                                "Cancel", on_clicked=self.close, auto_default=False
-                            ),
+                            PushButton("Ok", on_clicked=open_edit_dialog, auto_default=True),
+                            PushButton("Cancel", on_clicked=self.close, auto_default=False),
                         ]
                     ),
                 ]

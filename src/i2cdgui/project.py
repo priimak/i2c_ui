@@ -102,7 +102,7 @@ class Project:
 
     def add_custom_command(self, command: CustomCommand):
         self.commands.append(command)
-        self.commands.sort(key=lambda cmd: cmd.label)
+        self.commands.sort(key=lambda cmd: cmd.label.lower())
         self.commands_by_label[command.label] = command
         self.save_commands()
 
