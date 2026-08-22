@@ -23,6 +23,8 @@ from i2cdgui.gui_tools import (
 )
 from i2cdgui.project import CustomCommand
 
+# TODO: Switching project should refresh that that holds list of commands
+
 
 @dataclass
 class CommandLabelAndId:
@@ -195,6 +197,7 @@ class CustomCommandsPanel(VBoxPanel):
                         "write": lambda r: r._write(),
                         "print": print_into_commands_log_panel,
                         "dut": dut_cls(),
+                        "ctx": self.app.project.commands_context,
                         "prompt_user": mk_prompt_user(cmd.label),
                         "Variable": Variable,
                         "exit": exit_eval,

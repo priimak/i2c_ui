@@ -5,12 +5,32 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import CodeType
-from typing import Self
+from typing import Any, Self
 
 from rgscore import RegList
 
 PROJECT_RE = re.compile("^[a-zA-Z0-9_]+$")
 PROJECT_VALID_CHAR_RE = re.compile("[a-zA-Z0-9_]")
+
+
+class CommandsContext:
+    def __init__(self):
+        self.__context_attributes = dict()
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        if key == "_CommandsContext__context_attributes":
+            super().__setattr__(key, value)
+        else:
+            self.__context_attributes[key] = value
+
+    def __getattribute__(self, name: str, /) -> Any:
+        if name == "_CommandsContext__context_attributes":
+            return super().__getattribute__(name)
+        else:
+            try:
+                return self.__context_attributes[name]
+            except KeyError:
+                raise AttributeError(f"Context does not have variable [{name}]")
 
 
 @dataclass
@@ -78,6 +98,7 @@ class Project:
     def __init__(self, name: str, dir: Path):
         self.name = name
         self.dir = dir
+        self.commands_context = CommandsContext()
 
         self.version_json_path = self.dir / "version.json"
         self.reg_list_path = self.dir / "regList.json"
