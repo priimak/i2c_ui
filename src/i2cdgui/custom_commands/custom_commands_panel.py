@@ -23,8 +23,6 @@ from i2cdgui.gui_tools import (
 )
 from i2cdgui.project import CustomCommand
 
-# TODO: Switching project should refresh that that holds list of commands
-
 
 @dataclass
 class CommandLabelAndId:

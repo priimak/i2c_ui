@@ -246,6 +246,7 @@ class App:
         self.project = self.projects.open_project(name)
         self.request_results_reload()
         self.request_reglist_reload()
+        self.request_commands_reload()
         self.update_project_selector_current_project(self.project.name)
         self.persistence.config.set_value("last_open_project", name)
 
