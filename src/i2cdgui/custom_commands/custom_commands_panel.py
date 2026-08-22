@@ -30,10 +30,6 @@ class CommandLabelAndId:
     id: str
 
 
-# TODO: implement that pressing Enter/Return executes command
-# TODO: implement that pressing Del attempts to delete command and select next nearest row
-
-
 class CommandsListModel(
     TableModelWithOneColumn,
     TableModelAllSelectableAndEnabled,
@@ -72,25 +68,21 @@ class CommandsListModel(
 
     def apply_filter(self, filter_text: str, post_filter_action: Callable[[], Any]):
         char_filter = list(filter_text)
+        self.beginResetModel()
         try:
-            self.beginResetModel()
             self.commands_to_display.clear()
-            if char_filter == []:
-                self.commands_to_display = self.mk_commands_to_display()
-                self.endResetModel()
-                post_filter_action()
-                return
-
             commands_to_display_input = self.mk_commands_to_display()
 
-            for command in commands_to_display_input:
-                new_command_label = apply_filter_to_text(char_filter, command.label)
-                if new_command_label is not None:
-                    self.commands_to_display.append(CommandLabelAndId(new_command_label, command.label))
+            if char_filter == []:
+                self.commands_to_display = commands_to_display_input
+            else:
+                for command in commands_to_display_input:
+                    new_command_label = apply_filter_to_text(char_filter, command.label)
+                    if new_command_label is not None:
+                        self.commands_to_display.append(CommandLabelAndId(new_command_label, command.label))
         finally:
             self.endResetModel()
-
-        post_filter_action()
+            post_filter_action()
 
 
 class ResultsText(QTextEdit):
@@ -160,10 +152,13 @@ class CustomCommandsPanel(VBoxPanel):
 
     def pass_key_press_event(self) -> Callable[[QKeyEvent], None]:
         def key_pressed(event: QKeyEvent) -> None:
-            if event.key() in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
-                self.eval_selected_command()
-            else:
-                self.search_field.keyPressEvent(event)
+            match event.key():
+                case Qt.Key.Key_Return | Qt.Key.Key_Enter:
+                    self.eval_selected_command()
+                case Qt.Key.Key_Delete:
+                    self.delete_selected_command()
+                case _:
+                    self.search_field.keyPressEvent(event)
 
         return key_pressed
 
@@ -219,18 +214,18 @@ class CustomCommandsPanel(VBoxPanel):
     def define_new_command(self):
         CustomCommandsEditor(self.app, cmd=None).exec()
 
-    def get_selected_command(self) -> CustomCommand | None:
+    def get_selected_command(self) -> tuple[CustomCommand, int] | None:
         selected_indexes = self.commands_table.selectedIndexes()
         if selected_indexes is not None and len(selected_indexes) > 0:
             selected_row = selected_indexes[0].row()
             label = self.commands_table.table_model.commands_to_display[selected_row].id
-            return self.app.project.get_custom_command_by_label(label)
+            return self.app.project.get_custom_command_by_label(label), selected_row
         else:
             return None
 
     def delete_selected_command(self):
         match self.get_selected_command():
-            case CustomCommand() as cmd:
+            case (cmd, row):
                 ret = QMessageBox.question(
                     self.app.main_window,
                     "Delete custom command?",
@@ -243,10 +238,11 @@ class CustomCommandsPanel(VBoxPanel):
                     self.app.project.delete_custom_command(cmd.label)
                     self.commands_table.table_model.regenerate_commands_to_display()
                     self.commands_table.table_model.endResetModel()
+                    self.commands_table.selectRow(min(self.commands_table.table_model.rowCount() - 1, row))
 
     def edit_selected_command(self):
         match self.get_selected_command():
-            case CustomCommand() as cmd:
+            case (cmd, _):
                 CustomCommandsEditor(self.app, cmd).exec()
 
     def request_commands_reload(self):

@@ -296,10 +296,13 @@ class RegListPanel(VBoxPanel):
 
     def pass_key_press_event(self) -> Callable[[QKeyEvent], None]:
         def key_pressed(event: QKeyEvent) -> None:
-            if event.key() in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
-                self.read_selected_register()
-            else:
-                self.search_field.keyPressEvent(event)
+            match event.key():
+                case Qt.Key.Key_Return | Qt.Key.Key_Enter:
+                    self.read_selected_register()
+                case Qt.Key.Key_Delete:
+                    self.delete_selected_register()
+                case _:
+                    self.search_field.keyPressEvent(event)
 
         return key_pressed
 
@@ -347,7 +350,7 @@ class RegListPanel(VBoxPanel):
                 self.app.project.reg_list.delete_register_by_name(register.name)
                 self.app.request_reglist_reload()
                 self.search_field.textChanged.emit(self.search_field.text())
-                self.reglist_table.selectRow(register.row)
+                self.reglist_table.selectRow(min(self.reglist_table.table_model.rowCount() - 1, register.row))
                 self.app.update_results_display_data()
                 self.app.request_results_reload()
 

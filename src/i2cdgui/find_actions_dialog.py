@@ -13,6 +13,7 @@ from PySide6.QtGui import QKeyEvent
 from pytide6 import Dialog, Label, VBoxLayout
 
 from i2cdgui.app import App
+from i2cdgui.custom_commands.custom_command_editor import CustomCommandsEditor
 from i2cdgui.gui_tools import (
     InTableSearchField,
     ListTableView,
@@ -41,11 +42,13 @@ ACTIONS = [
     Action("Add new variable to watch list", None),
     Action("Create new project", lambda app: NewProjectDialog(app).exec()),
     Action("Define new register", lambda app: NewRegDefDialog(app).exec()),
+    Action("Define new custom action/command", lambda app: CustomCommandsEditor(app, cmd=None).exec()),
     Action(
         "Delete currently active project",
         lambda app: DeleteProjectDialog(app, app.project.name).exec(),
     ),
     Action("Exit/Quit application", lambda app: app.exit_application[0]()),
+    Action("Execute custom action/command", None),
     Action("Export project into file", None),
     Action("Import project from file", None),
     Action("Open project", lambda app: OpenProjectDialog(app).exec()),
@@ -73,9 +76,7 @@ class ActionsModel(
     def rowCount(self, /, parent: QModelIndex | QPersistentModelIndex = ...) -> int:
         return len(self.actions_to_display)
 
-    def data(
-        self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...
-    ) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, /, role: int = ...) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             return self.actions_to_display[index.row()].name
         else:
@@ -103,9 +104,7 @@ class ActionsModel(
 class FindActionDialog(Dialog):
     def __init__(self, app: App):
         super().__init__(app.main_window, windowTitle="Find Action", modal=True)
-        self.setWindowFlags(
-            QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Window
-        )
+        self.setWindowFlags(QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Window)
         self.app = app
         self.actions_table = ListTableView(
             table_model=ActionsModel(),
@@ -115,16 +114,10 @@ class FindActionDialog(Dialog):
         )
         self.search_field = InTableSearchField(
             table_view=self.actions_table,
-            on_key_enter=lambda index: (
-                self.actions_table.table_model.actions_to_display[index.row()].action(
-                    self.app
-                )
-            ),
+            on_key_enter=lambda index: self.actions_table.table_model.actions_to_display[index.row()].action(self.app),
             close_action=self.close,
         )
-        self.setLayout(
-            VBoxLayout([Label("Find Action"), self.search_field, self.actions_table])
-        )
+        self.setLayout(VBoxLayout([Label("Find Action"), self.search_field, self.actions_table]))
         self.search_field.setFocus()
         screen_dim: QSize = app.q_application.primaryScreen().size()
         self.resize(int(screen_dim.width() / 2), int(screen_dim.height() / 3))
